@@ -1,0 +1,39 @@
+MCH, tu libreta de entreno
+==========================
+
+CÓMO INSTALARLA GRATIS EN EL IPHONE
+
+1. Súbela a internet (gratis) con GitHub Pages. Mejor desde el ordenador:
+   - Entra en github.com y crea una cuenta si no tienes.
+   - Arriba a la derecha: "+" > New repository. Nombre: mch. Marca Public. Create repository.
+   - Pulsa "uploading an existing file" y arrastra TODO lo que hay dentro de esta carpeta
+     (index.html, sw.js, manifest.webmanifest y las carpetas fonts e icons). Commit changes.
+   - Settings > Pages > Branch: main, carpeta / (root) > Save.
+   - En uno o dos minutos te dará tu dirección: https://TU-USUARIO.github.io/mch/
+   El repositorio es público, pero tus entrenos no: se guardan solo en tu iPhone.
+
+2. En el iPhone, abre esa dirección en Safari.
+
+3. Toca el botón de compartir (o los tres puntos > Compartir) > "Añadir a pantalla de inicio".
+   Deja activado "Abrir como app web" y toca Añadir. Si quieres, cambia ahí el nombre.
+
+A partir de ahí se abre como una app, a pantalla completa y también sin cobertura.
+
+
+TUS DATOS
+
+- Se guardan solo en tu iPhone. La app no envía nada a ningún sitio.
+- Haz una copia de vez en cuando: Hoy > Ajustes > Exportar copia, y guárdala en Archivos o iCloud Drive.
+- Antes de borrar el icono o de cambiar de móvil, exporta una copia. En el móvil nuevo: Ajustes > Importar copia.
+
+
+PARA PROBARLA ANTES DE EMPEZAR
+
+En la pantalla Hoy, "Probar con datos de ejemplo" carga una rutina y dos meses de entrenos inventados.
+Cuando termines de curiosear: "Borrar y empezar", y creas tu rutina.
+
+
+SI ALGÚN DÍA CAMBIAS ALGO DE LA APP
+
+Sube los archivos nuevos a GitHub y cambia el número de VERSION en sw.js
+(por ejemplo, mch-1.0.1) para que el iPhone descargue la versión nueva.
