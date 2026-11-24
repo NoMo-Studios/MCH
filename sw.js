@@ -1,16 +1,16 @@
 /* MCH: guarda la app en el iPhone para que abra al instante y sin conexión.
    Al cambiar cualquier archivo, sube la versión para que se actualice. */
-const VERSION = 'mch-1.0.0';
+const VERSION = 'mch-1.0.1';
 const FILES = [
   './',
   './index.html',
   './manifest.webmanifest',
-  './fonts/mch-display-400.woff',
-  './fonts/mch-display-700.woff',
-  './icons/icon-180.png',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
-  './icons/icon-512-maskable.png'
+  './mch-display-400.woff',
+  './mch-display-700.woff',
+  './icon-180.png',
+  './icon-192.png',
+  './icon-512.png',
+  './icon-512-maskable.png'
 ];
 
 self.addEventListener('install', (event) => {

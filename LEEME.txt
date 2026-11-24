@@ -6,8 +6,8 @@ CÓMO INSTALARLA GRATIS EN EL IPHONE
 1. Súbela a internet (gratis) con GitHub Pages. Mejor desde el ordenador:
    - Entra en github.com y crea una cuenta si no tienes.
    - Arriba a la derecha: "+" > New repository. Nombre: mch. Marca Public. Create repository.
-   - Pulsa "uploading an existing file" y arrastra TODO lo que hay dentro de esta carpeta
-     (index.html, sw.js, manifest.webmanifest y las carpetas fonts e icons). Commit changes.
+   - Pulsa "uploading an existing file" (o Add file > Upload files) y sube los 10 archivos
+     de esta carpeta, todos sueltos. Commit changes.
    - Settings > Pages > Branch: main, carpeta / (root) > Save.
    - En uno o dos minutos te dará tu dirección: https://TU-USUARIO.github.io/mch/
    El repositorio es público, pero tus entrenos no: se guardan solo en tu iPhone.
@@ -36,4 +36,4 @@ Cuando termines de curiosear: "Borrar y empezar", y creas tu rutina.
 SI ALGÚN DÍA CAMBIAS ALGO DE LA APP
 
 Sube los archivos nuevos a GitHub y cambia el número de VERSION en sw.js
-(por ejemplo, mch-1.0.1) para que el iPhone descargue la versión nueva.
+(por ejemplo, mch-1.0.2) para que el iPhone descargue la versión nueva.
