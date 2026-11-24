@@ -321,7 +321,7 @@ svg.spark circle{fill:var(--blue)}
 'use strict';
 /* ───────── Datos fijos ───────── */
 const KEY='mch.v1';
-const MUSCLES=['Pecho','Espalda','Hombro','Bíceps','Tríceps','Antebrazo','Cuádriceps','Femoral','Glúteo','Gemelo','Abdomen','Otro'];
+const MUSCLES=['Pecho','Espalda','Hombro','Trapecio','Bíceps','Tríceps','Antebrazo','Cuádriceps','Femoral','Glúteo','Gemelo','Abdomen','Cuello','Otro'];
 const CATALOG=[
  ['Press banca','Pecho'],['Press inclinado con barra','Pecho'],['Press inclinado con mancuernas','Pecho'],['Press con mancuernas','Pecho'],['Aperturas con mancuernas','Pecho'],['Cruce de poleas','Pecho'],['Contractora','Pecho'],
  ['Dominadas','Espalda'],['Jalón al pecho','Espalda'],['Remo con barra','Espalda'],['Remo con mancuerna','Espalda'],['Remo en polea baja','Espalda'],['Remo en máquina','Espalda'],['Peso muerto','Espalda'],['Pullover en polea','Espalda'],
@@ -335,7 +335,7 @@ const CATALOG=[
  ['Crunch en polea','Abdomen'],['Elevación de piernas','Abdomen'],['Rueda abdominal','Abdomen'],
  ['Curl de muñeca','Antebrazo']
 ];
-const INCS=[1,1.25,2,2.5,5];
+const INCS=[0.5,1,1.25,2,2.5,5];
 const TABS=['hoy','historial','progreso','cuerpo'];
 const FULL=['workout','day','item','exedit','bodyedit','pick'];
 const MEASURES=[['waist','Cintura'],['chest','Pecho'],['arm','Brazo'],['thigh','Muslo'],['hip','Cadera']];
@@ -429,11 +429,13 @@ function history(exId){
   return out;
 }
 const isBW=h=>h.length>0&&h.every(x=>x.maxW===0);
-function lastEntry(exId,itemId){
+function findItem(id){for(const d of S.days)for(const it of d.items)if(it.id===id)return it;return null}
+function lastEntry(exId,item){
   let any=null;
+  const same=en=>{if(!item)return false;if(en.item===item.id)return true;const o=en.item?findItem(en.item):null;return !!o&&o.sets===item.sets&&o.min===item.min&&o.max===item.max};
   for(const s of S.sessions.slice().sort((a,b)=>b.start-a.start))for(const en of s.entries){
     if(en.ex!==exId||!en.sets.length)continue;
-    if(itemId&&en.item===itemId)return en;
+    if(same(en))return en;
     if(!any)any=en;
   }
   return any;
@@ -466,9 +468,10 @@ function markRecords(en){
   if(+hw.w>b.w+1e-9)hw.rec='peso';
   if(!he.rec&&e1(+he.w,+he.r)>b.e+0.05)he.rec='1rm';
 }
+function muscleOpts(cur){const set=new Set(MUSCLES.filter(m=>m!=='Otro'));const own=[...new Set(Object.values(S.ex).map(e=>e.muscle).concat(cur?[cur]:[]))].filter(m=>m&&!set.has(m)&&m!=='Otro').sort((a,b)=>a.localeCompare(b,'es'));return [...set,...own,'Otro']}
 const recText=st=>st.rec==='peso'?'Récord de peso':st.rec==='reps'?'Récord de repeticiones':`Récord de 1RM estimado: ${kg(half(e1(+st.w,+st.r)))} kg`;
 function makeEntry(exId,item){
-  const ex=S.ex[exId];const last=lastEntry(exId,item?item.id:null);
+  const ex=S.ex[exId];const last=lastEntry(exId,item||null);
   const target=item?item.sets:(last?last.sets.length:3);
   const sug=suggestion(item,ex,last);
   const inc=(ex&&ex.inc)||2.5;
@@ -551,8 +554,8 @@ function vHoy(){
     h+=`<section class="hero"><p class="muted">Entreno en curso</p><p class="hero-day">${esc(d.dayName)}</p>${d.dayLabel?`<p class="hero-label">${esc(d.dayLabel)}</p>`:''}<p class="muted">${dn} de ${tot} ${tot===1?'serie hecha':'series hechas'}</p>
     <div class="hero-acts"><button class="btn primary" data-act="resume">Continuar</button><button class="btn text danger" data-act="discard">Descartar entreno</button></div></section>`;
   }else if(!S.days.length){
-    h+=`<section class="hero empty"><h2 class="hero-label">Crea tu rutina</h2><p class="muted">Añade tus días y los ejercicios de cada uno. Después, en cada entreno solo tendrás que apuntar los pesos.</p>
-    <div class="hero-acts"><button class="btn primary" data-act="routine">Crear rutina</button><button class="btn text" data-act="sample">Probar con datos de ejemplo</button></div></section>`;
+    h+=`<section class="hero empty"><h2 class="hero-label">Tu rutina está lista para cargar</h2><p class="muted">${esc(MY_ROUTINE.title)}: 5 días de gimnasio y el cuello en casa después de los días 1, 3 y 5. Luego puedes cambiar lo que quieras en Ajustes, Rutina.</p>
+    <div class="hero-acts"><button class="btn primary" data-act="mine">Cargar mi rutina</button><button class="btn text" data-act="routine">Crear otra desde cero</button><button class="btn text" data-act="sample">Probar con datos de ejemplo</button></div></section>`;
   }else{
     const nx=nextDay(),lt=lastDone(nx.id);
     h+=`<section class="hero"><p class="muted">Te toca</p><p class="hero-day">${esc(nx.name)}</p>${nx.label?`<p class="hero-label">${esc(nx.label)}</p>`:''}<p class="muted">${plural(nx.items.length,'ejercicio','ejercicios')}${lt?`. La última vez, ${ago(lt)}`:''}.</p>
@@ -751,7 +754,7 @@ function vSettings(){
     <input type="file" id="import-file" class="vh" tabindex="-1"></section>
   ${S.sample?`<section class="sec"><h2 class="h">Datos de ejemplo</h2><p class="help">Ahora ves una rutina y unos entrenos inventados para probar la app.</p><div class="form-acts"><button class="btn soft danger" data-act="clear-sample">Borrar datos de ejemplo</button></div></section>`:''}
   <div class="form-acts sec"><button class="btn soft danger" data-act="wipe">Borrar todos los datos</button></div>
-  <p class="small foot">MCH 1.0. Funciona sin conexión y no envía tus datos a ningún sitio. Tipografía: TeX Gyre Adventor, de GUST e-foundry.</p>`;
+  <p class="small foot">MCH 1.1. Funciona sin conexión y no envía tus datos a ningún sitio. Tipografía: TeX Gyre Adventor, de GUST e-foundry.</p>`;
 }
 
 function vRoutine(){
@@ -793,7 +796,7 @@ function vItem(c){
     </div>
     <p class="help">Cuando llegues al máximo de repeticiones en todas las series, MCH te propondrá subir de peso.</p>
     <div class="pair">
-      <label class="field"><span>Músculo</span><span class="sel"><select id="f-muscle" data-auto="${ex?'0':'1'}">${MUSCLES.map(x=>`<option${x===muscle?' selected':''}>${x}</option>`).join('')}</select>${icon('chevDown')}</span></label>
+      <label class="field"><span>Músculo</span><span class="sel"><select id="f-muscle" data-auto="${ex?'0':'1'}">${muscleOpts(muscle).map(x=>`<option${x===muscle?' selected':''}>${esc(x)}</option>`).join('')}</select>${icon('chevDown')}</span></label>
       <label class="field"><span>Subida de peso</span><span class="sel"><select id="f-inc">${INCS.map(v=>`<option value="${v}"${v===inc?' selected':''}>${kg(v)} kg</option>`).join('')}</select>${icon('chevDown')}</span></label>
     </div>
     <label class="field"><span>Nota <span class="opt">(opcional)</span></span><textarea id="f-note" rows="3" maxlength="200" placeholder="Ajustes de la máquina, técnica, molestias…">${esc(ex?ex.note:'')}</textarea></label>
@@ -815,7 +818,7 @@ function vExEdit(c){
   <form class="form" data-form="exedit" novalidate>
     <label class="field"><span>Nombre</span><input id="e-name" value="${esc(e.name)}" autocomplete="off" maxlength="60"></label>
     <div class="pair">
-      <label class="field"><span>Músculo</span><span class="sel"><select id="e-muscle">${MUSCLES.map(x=>`<option${x===e.muscle?' selected':''}>${x}</option>`).join('')}</select>${icon('chevDown')}</span></label>
+      <label class="field"><span>Músculo</span><span class="sel"><select id="e-muscle">${muscleOpts(e.muscle).map(x=>`<option${x===e.muscle?' selected':''}>${esc(x)}</option>`).join('')}</select>${icon('chevDown')}</span></label>
       <label class="field"><span>Subida de peso</span><span class="sel"><select id="e-inc">${INCS.map(v=>`<option value="${v}"${v===e.inc?' selected':''}>${kg(v)} kg</option>`).join('')}</select>${icon('chevDown')}</span></label>
     </div>
     <label class="field"><span>Nota <span class="opt">(opcional)</span></span><textarea id="e-note" rows="3" maxlength="200" placeholder="Ajustes de la máquina, técnica, molestias…">${esc(e.note||'')}</textarea></label>
@@ -1055,6 +1058,7 @@ const ACT={
   'sheet-close':()=>closeSheet(),
   'sheet-act':d=>{const a=sheetActs[+d.k];closeSheet();if(a&&a.run)a.run()},
   sample:()=>{loadSample();render();scrollTo(0,0);toast('Datos de ejemplo cargados')},
+  mine:()=>{loadMine();render();scrollTo(0,0);toast('Rutina cargada')},
   'clear-sample':()=>confirmDel('¿Borrar los datos de ejemplo?','La app quedará vacía para que crees tu rutina.','Borrar y empezar',()=>{S=fresh();save();nav=[{v:'hoy'}];render();scrollTo(0,0)}),
   wipe:()=>confirmDel('¿Borrar todos los datos?','Se borran tu rutina, tus entrenos y tus registros de este iPhone. Si quieres conservarlos, exporta antes una copia.','Borrar todo',()=>{S=fresh();save();nav=[{v:'hoy'}];render();scrollTo(0,0);toast('Datos borrados')}),
   export:()=>exportBackup(),
@@ -1257,6 +1261,77 @@ document.addEventListener('visibilitychange',()=>{
   else if(TABS.includes(cur().v)&&!sheetOpen)renderKeep();
 });
 addEventListener('pagehide',save);
+
+/* ───────── Tu rutina: Físico en V (versión revisada 3) ───────── */
+/* [nombre, músculo, series, reps desde, reps hasta, subida en kg, nota] */
+const NECK_FLEX=['Flexión de cuello con mochila','Cuello',2,15,25,0.5,'Mete la barbilla y luego llévala al pecho. 2-3 s subiendo y 2-3 bajando. RIR 1-2, nunca al fallo. Descanso 1 min.'];
+const NECK_EXT=['Extensión de cuello con mochila','Cuello',2,15,25,0.5,'Boca abajo, mochila en la nuca. Sube hasta mirar al frente, sin forzar atrás. RIR 1-2, nunca al fallo. Descanso 1 min.'];
+const NECK_LAT=['Flexión lateral de cuello con mochila','Cuello',2,15,25,0.5,'Reps por lado: primero un lado y luego el otro. Apunta el lado que menos haga. RIR 1-2, nunca al fallo. Descanso 1 min.'];
+const MY_ROUTINE={title:'Físico en V',goal:5,days:[
+  {name:'Día 1',label:'Push A: pecho y hombro lateral',items:[
+    ['Press banca con barra','Pecho',4,6,10,2.5,'Compuesto principal de pecho. RIR 1-2. Descanso 2-3 min.'],
+    ['Press inclinado con mancuernas','Pecho',4,8,12,2,'Pecho superior: las mancuernas bajan más, más estiramiento. RIR 1-2. Descanso 2-3 min.'],
+    ['Aperturas en polea baja','Pecho',3,12,15,2.5,'De abajo arriba, cruzando delante del pecho. Tensión constante. RIR 0-1. Descanso 1,5 min.'],
+    ['Elevaciones laterales con mancuernas','Deltoide lateral',4,12,15,2,'Prioridad nº 1 de la V. RIR 0-1, la última serie al fallo. Descanso 1-1,5 min.'],
+    ['Elevación lateral en polea, inclinado','Deltoide lateral',3,15,20,2.5,'A una mano. Empieza con el brazo cruzado por delante del cuerpo. RIR 0-1. Descanso 1 min.'],
+    ['Fondos en máquina','Tríceps',2,10,12,2.5,'Con el pecho ya cansado. Baja solo hasta donde no moleste el hombro. RIR 1-2. Descanso 2 min.'],
+    ['Extensión de tríceps en polea con barra','Tríceps',3,10,15,2.5,'Polea alta. RIR 0-1. Descanso 1-1,5 min.'],
+    ['Crunch en máquina con almohadilla','Abdomen',4,12,15,2.5,'Almohadilla en el pecho: empuja redondeando la espalda, sin doblar la cadera. RIR 0-1. Descanso 1 min.']]},
+  {name:'Cuello',label:'En casa: flexión, extensión y lateral',items:[NECK_FLEX,NECK_EXT,NECK_LAT]},
+  {name:'Día 2',label:'Pull A: espalda (anchura), hombro, bíceps y trapecio',items:[
+    ['Dominadas','Espalda',4,6,10,2.5,'Agarre prono, un palmo más ancho que los hombros. Si aún no haces 6, en máquina asistida. Sin lastre, apunta 0 kg. RIR 1-2. Descanso 2-3 min.'],
+    ['Elevaciones laterales en máquina','Deltoide lateral',3,15,20,2.5,'Con el hombro fresco. RIR 0-1. Descanso 1 min.'],
+    ['Jalón al pecho, agarre ancho','Espalda',3,8,12,2.5,'Agarre ancho prono. RIR 1-2. Descanso 2 min.'],
+    ['Pullover en polea alta con cuerda','Espalda',3,12,15,2.5,'Brazos rectos: dorsal aislado, sin que tire el bíceps. RIR 0-1. Descanso 1,5 min.'],
+    ['Remo con barra en T','Espalda',3,8,10,2.5,'RIR 1-2. Descanso 2-3 min.'],
+    ['Pájaros en peck deck inverso','Deltoide posterior',3,15,20,2.5,'Deltoide posterior y trapecio medio. RIR 0-1. Descanso 1 min.'],
+    ['Curl de bíceps con barra recta','Bíceps',3,8,12,2.5,'RIR 0-1. Descanso 1,5 min.'],
+    ['Curl martillo con mancuernas','Bíceps',3,10,12,2,'Braquial y braquiorradial. RIR 0-1. Descanso 1-1,5 min.'],
+    ['Encogimientos con mancuernas','Trapecio',4,12,15,2,'Pausa de 1 s arriba. Trapecio superior. RIR 0-1. Descanso 1-1,5 min.']]},
+  {name:'Día 3',label:'Pierna y core',items:[
+    ['Prensa de piernas a 45°','Cuádriceps',4,8,12,5,'Baja todo lo que puedas sin despegar la zona lumbar; pies a media altura. RIR 1-2. Descanso 2-3 min.'],
+    ['Curl femoral tumbado','Femoral',5,8,12,2.5,'Extiende la rodilla del todo abajo y aguanta 1 s. No levantes la cadera. RIR 0-1. Descanso 1,5 min.'],
+    ['Extensión de cuádriceps','Cuádriceps',4,12,15,2.5,'Trabaja el recto femoral, que la prensa apenas toca. RIR 0-1. Descanso 1,5 min.'],
+    ['Curl femoral tumbado a una pierna','Femoral',3,10,12,2.5,'Reps por pierna, recorrido completo. Apunta la pierna que menos haga. RIR 0-1. Descanso 1 min.'],
+    ['Elevación de talones de pie en máquina','Gemelo',4,12,15,2.5,'Rodilla recta y pausa de 1-2 s abajo. RIR 0-1. Descanso 1-1,5 min.'],
+    ['Elevación de piernas colgado','Abdomen',4,10,15,2,'Al final, curva la pelvis hacia arriba. Al llegar a 15, mancuerna entre los pies. Sin peso, apunta 0 kg. RIR 0-1. Descanso 1 min.']]},
+  {name:'Cuello',label:'En casa: flexión y extensión',items:[NECK_FLEX,NECK_EXT]},
+  {name:'Día 4',label:'Push B: pecho, hombro y postura',items:[
+    ['Press inclinado en máquina','Pecho',3,8,12,2.5,'Primero: el pecho es prioridad. La máquina permite llegar cerca del fallo con seguridad. RIR 1-2. Descanso 2-3 min.'],
+    ['Fondos en paralelas','Pecho',3,8,12,2.5,'Inclinado hacia delante: énfasis pecho. Baja solo hasta donde el hombro no moleste. Sin lastre, apunta 0 kg. RIR 1-2. Descanso 2 min.'],
+    ['Elevaciones laterales con mancuernas','Deltoide lateral',4,15,20,2,''],
+    ['Cruce de poleas desde arriba','Pecho',3,12,15,2.5,'Posición alta, de arriba abajo: porción esternal e inferior del pecho. RIR 0-1. Descanso 1,5 min.'],
+    ['Press militar en máquina','Deltoide anterior',4,8,10,2.5,'Va detrás del pecho y las laterales. RIR 2. Descanso 2 min.'],
+    ['Face pull en polea con cuerda','Deltoide posterior',3,12,15,2.5,'RIR 0-1. Descanso 1 min.'],
+    ['Y-raise en banco inclinado','Trapecio',2,12,15,1,'Con mancuernas. Trapecio inferior. RIR 0-1. Descanso 1 min.'],
+    ['Extensión de tríceps sobre la cabeza','Tríceps',3,12,15,2.5,'En polea con cuerda. La posición estirada hace crecer más. RIR 0-1. Descanso 1-1,5 min.'],
+    ['Crunch en máquina con agarres','Abdomen',4,12,15,2.5,'Agarres a la altura de la cabeza. Lleva el pecho hacia la pelvis; no tires con los brazos. RIR 0-1. Descanso 1 min.']]},
+  {name:'Día 5',label:'Pull B: espalda (grosor), hombro, bíceps y trapecio',items:[
+    ['Remo con mancuerna a una mano','Espalda',4,8,10,2,'Codo pegado al cuerpo, hacia la cadera: énfasis dorsal. RIR 1-2. Descanso 2-3 min.'],
+    ['Elevaciones laterales en máquina','Deltoide lateral',3,15,20,2.5,''],
+    ['Jalón al pecho, agarre neutro','Espalda',3,10,12,2.5,'RIR 1-2. Descanso 2 min.'],
+    ['Remo en polea baja, codos abiertos','Espalda',3,10,12,2.5,'Barra ancha, codos a 45-60° del cuerpo: trapecio medio, romboides y deltoide posterior. RIR 1-2. Descanso 2 min.'],
+    ['Pájaros en peck deck inverso','Deltoide posterior',3,15,20,2.5,''],
+    ['Curl en banco Scott con barra Z','Bíceps',3,10,12,2.5,'Carga el bíceps con el codo estirado. RIR 0-1. Descanso 1-1,5 min.'],
+    ['Curl alterno con mancuernas, de pie','Bíceps',3,10,12,2,'RIR 0-1. Descanso 1-1,5 min.'],
+    ['Encogimientos con mancuernas','Trapecio',4,12,15,2,''],
+    ['Crunch declinado con disco','Abdomen',3,10,15,2.5,'Disco sujeto al pecho. Baja hasta casi tumbarte. RIR 0-1. Descanso 1 min.']]},
+  {name:'Cuello',label:'En casa: flexión, extensión y lateral',items:[NECK_FLEX,NECK_EXT,NECK_LAT]}
+]};
+function loadMine(){
+  S.sample=false;S.goal=MY_ROUTINE.goal;S.days=[];
+  for(const d of MY_ROUTINE.days){
+    const day={id:uid(),name:d.name,label:d.label,items:[]};
+    for(const [name,muscle,sets,min,max,inc,note] of d.items){
+      let ex=findEx(name);
+      if(!ex){ex={id:uid(),name,muscle,note:note||'',inc};S.ex[ex.id]=ex}
+      else if(!ex.note&&note)ex.note=note;
+      day.items.push({id:uid(),ex:ex.id,sets,min,max});
+    }
+    S.days.push(day);
+  }
+  save();
+}
 
 /* ───────── Datos de ejemplo ───────── */
 function mulberry(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
