@@ -351,7 +351,9 @@ span.cam-ic{background:none}
 @media (prefers-reduced-motion:reduce){.ring .rf{transition:none}}
 .f3{position:relative;margin-top:4px}
 .f3-stage{position:relative;aspect-ratio:400/460;touch-action:pan-y;user-select:none;-webkit-user-select:none}
-.f3-c{position:absolute;left:23%;top:0;width:54%;height:100%;display:block;opacity:0;transition:opacity 600ms var(--ease-out)}
+.f3-c{position:absolute;left:22%;top:0;width:56%;height:100%;display:block;opacity:0;transition:opacity 600ms var(--ease-out)}
+.sl.bad b{color:var(--ink-2)}
+.f3-stage.failed::after{content:"La figura se descarga la primera vez que hay conexión.";position:absolute;left:25%;right:25%;top:44%;text-align:center;font-size:14px;color:var(--ink-2)}
 .f3-stage.ready .f3-c{opacity:1}
 .f3-stage.loading::after{content:"";position:absolute;left:50%;top:46%;width:26px;height:26px;margin:-13px;border-radius:50%;border:2px solid var(--field-2);border-top-color:var(--ink-2);animation:spin 900ms linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -1333,300 +1335,142 @@ function showInfo(k){const x=INFO[k];if(!x)return;sheetActs=[];openSheet(`<h2 cl
 /* MCH Body 3D: figura generada desde las medidas.
    Tronco y extremidades como secciones elípticas que varían a lo largo del cuerpo (perfiles
    sacados de proporciones anatómicas), músculos encima y malla con Surface Nets. */
-const BODY3D_FACTORY=()=>{
-const sqrt=Math.sqrt,max=Math.max,min=Math.min,abs=Math.abs,PI=Math.PI;
-const clamp01=v=>v<0?0:v>1?1:v;
-const sq=v=>v*v;
-const sst=(a,b,v)=>{let t=(v-a)/(b-a);t=t<0?0:t>1?1:t;return t*t*(3-2*t)};
-function semiA(circ,ratio){const k=PI*(3*(1+ratio)-sqrt((3+ratio)*(1+3*ratio)));return circ/k}
-function smin(a,b,k){const h=max(k-abs(a-b),0)/k;return min(a,b)-h*h*k*0.25}
-function smax(a,b,k){return -smin(-a,-b,k)}
-function ell(x,y,z,rx,ry,rz){const ax=x/rx,ay=y/ry,az=z/rz,k0=sqrt(ax*ax+ay*ay+az*az),bx=ax/rx,by=ay/ry,bz=az/rz,k1=sqrt(bx*bx+by*by+bz*bz);return k1>1e-9?k0*(k0-1)/k1:-min(rx,ry,rz)}
-function ell2(x,z,a,b){const ax=x/a,az=z/b,k0=sqrt(ax*ax+az*az),bx=ax/a,bz=az/b,k1=sqrt(bx*bx+bz*bz);return k1>1e-9?k0*(k0-1)/k1:-min(a,b)}
-function cap(px,py,pz,ax,ay,az,bx,by,bz,r){const pax=px-ax,pay=py-ay,paz=pz-az,bax=bx-ax,bay=by-ay,baz=bz-az;let h=(pax*bax+pay*bay+paz*baz)/(bax*bax+bay*bay+baz*baz);h=h<0?0:h>1?1:h;const dx=pax-bax*h,dy=pay-bay*h,dz=paz-baz*h;return sqrt(dx*dx+dy*dy+dz*dz)-r}
-const norm3=(x,y,z)=>{const l=sqrt(x*x+y*y+z*z)||1;return [x/l,y/l,z/l]};
-const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
-/* perfil suave (Hermite con tangentes Catmull-Rom) muestreado en una tabla */
-function prof(keys,N){
-  N=N||256;const t0=keys[0][0],t1=keys[keys.length-1][0],T=new Float32Array(N+1);
-  const n=keys.length,tg=keys.map((k,i)=>{const a=keys[max(0,i-1)],b=keys[min(n-1,i+1)];return (b[1]-a[1])/((b[0]-a[0])||1)});
-  let s=0;
-  for(let q=0;q<=N;q++){const t=t0+(t1-t0)*q/N;while(s<n-2&&t>keys[s+1][0])s++;
-    const [xa,ya]=keys[s],[xb,yb]=keys[s+1],h=xb-xa,u=h?(t-xa)/h:0,u2=u*u,u3=u2*u;
-    T[q]=(2*u3-3*u2+1)*ya+(u3-2*u2+u)*h*tg[s]+(-2*u3+3*u2)*yb+(u3-u2)*h*tg[s+1];}
-  const inv=N/(t1-t0);
-  return t=>{let f=(t-t0)*inv;if(f<=0)return T[0];if(f>=N)return T[N];const i=f|0;f-=i;return T[i]+(T[i+1]-T[i])*f};
+/* ───────── Cuerpo 3D (MakeHuman, dominio público CC0) ─────────
+   Se ejecuta en un worker: carga la malla y sus deformaciones, elige músculo y grasa según tus
+   medidas, ajusta cada contorno, baja los brazos y calcula sombras de contacto. */
+const MHB_FACTORY=()=>{
+const sqrt=Math.sqrt,abs=Math.abs,max=Math.max,min=Math.min;
+function parse(buf){
+  const dv=new DataView(buf),u8=new Uint8Array(buf);
+  if(String.fromCharCode(u8[0],u8[1],u8[2],u8[3])!=='MCHB')throw new Error('formato');
+  const hl=dv.getUint32(4,true),H=JSON.parse(new TextDecoder().decode(u8.subarray(8,8+hl))),o0=8+hl;
+  const blk=b=>buf.slice(o0+b[0],o0+b[0]+b[1]);
+  const nv=H.nv,b16=new Int16Array(blk(H.base)),base=new Float32Array(nv*3);
+  for(let i=0;i<nv*3;i++)base[i]=b16[i]*H.bscale;
+  const T={};
+  for(const t of H.targets){
+    const vb=new Uint8Array(blk(t.idx)),q=new Int8Array(blk(t.d)),idx=new Uint16Array(t.n),d=new Float32Array(t.n*3);
+    let p=0,prev=0;for(let k=0;k<t.n;k++){let v=0,sh=0,b;do{b=vb[p++];v|=(b&127)<<sh;sh+=7}while(b&128);prev+=v;idx[k]=prev}
+    for(let k=0;k<t.n*3;k++)d[k]=q[k]*t.s;
+    T[t.name]={idx,d};
+  }
+  const arm=new Uint8Array(blk(H.armw));
+  return {nv,nb:H.nbody,base,tris:new Uint16Array(blk(H.tris)),flags:new Uint8Array(blk(H.flags)),armL:arm.subarray(0,nv),armR:arm.subarray(nv),reg:new Uint8Array(blk(H.reg)),rw:new Uint8Array(blk(H.rw)),T,lm:H.lm,joints:H.joints,anchors:H.anchors};
 }
-/* extremidad: secciones elípticas a lo largo de un eje A→B */
-function limb(A,B,side,W,Fr,Bk,e0,e1){e0=e0||0;e1=e1||0;
-  const L=sqrt((B[0]-A[0])**2+(B[1]-A[1])**2+(B[2]-A[2])**2),u=norm3(B[0]-A[0],B[1]-A[1],B[2]-A[2]);
-  let fw=norm3(...cross(u,side));if(fw[2]<0)fw=fw.map(v=>-v);
-  const sd=cross(fw,u);
-  return (px,py,pz)=>{
-    const dx=px-A[0],dy=py-A[1],dz=pz-A[2],t=(dx*u[0]+dy*u[1]+dz*u[2])/L;
-    const tc=t<0?0:t>1?1:t,lx=dx*sd[0]+dy*sd[1]+dz*sd[2],lz=dx*fw[0]+dy*fw[1]+dz*fw[2];
-    const w=W(tc),f=Fr(tc),k=Bk(tc),c=(f+k)/2,b=(f-k)/2;
-    let d=ell2(lx,lz-c,w,b);
-    if(t<0||t>1){const ov=t<0?t*L:(t-1)*L;return ell(lx,ov,lz-c,w,min(w,b),b)}
-    return d;
-  };
+function edges(A){
+  const s=new Set(),E=[],t=A.tris;
+  for(let i=0;i<t.length;i+=3)for(const [a,b] of [[t[i],t[i+1]],[t[i+1],t[i+2]],[t[i+2],t[i]]]){const k=a<b?a*65536+b:b*65536+a;if(!s.has(k)){s.add(k);E.push(a<b?a:b,a<b?b:a)}}
+  return new Uint32Array(E);
 }
-
-const DEF={h:{height:178,chest:100,waist:82,hip:96,shoulders:115,neck:38,arm:34,thigh:56,bf:16},m:{height:165,chest:90,waist:70,hip:98,shoulders:102,neck:32,arm:28,thigh:56,bf:25}};
-function params(m){
-  const fem=m.sex==='m',D=DEF[fem?'m':'h'];
-  const H=(m.height||D.height)/100,s=H/(fem?1.70:1.78)*(fem?0.955:1);
-  const cm=k=>(m[k]!=null?m[k]:D[k])/100;
-  const bf=m.bf!=null?m.bf:D.bf,mus=m.mus!=null?m.mus:(fem?0.3:0.45);
-  const fat=fem?clamp01((bf-16)/22):clamp01((bf-8)/22),lean=1-fat;
-  const P={H,s,fat,lean,mus,bf,fem};
-  P.chA=semiA(cm('chest'),fem?0.72:0.66);P.chB=P.chA*(fem?0.72:0.66);
-  const wr=0.70+fat*0.16;P.waA=semiA(cm('waist'),wr);P.waB=P.waA*wr;
-  P.hiA=semiA(cm('hip'),fem?0.78:0.80);P.hiB=P.hiA*(fem?0.78:0.80);
-  P.shA=max(semiA(cm('shoulders'),0.50),P.chA+(fem?0.02:0.035));
-  P.neR=cm('neck')/(2*PI);
-  P.arR=cm('arm')*0.92/(2*PI);
-  P.thR=cm('thigh')/(2*PI);
-  /* pecho femenino: lo que sobra de contorno de pecho respecto a la espalda */
-  P.bust=fem?clamp01((cm('chest')-cm('waist')*1.12)/0.16)*0.7+0.3:0;
-  if(fem){P.chA*=0.93;P.chB*=0.86}
-  return P;
+const tri3=v=>{v=v<0?0:v>1?1:v;return v<0.5?[['min',1-v/0.5],['average',v/0.5]]:[['average',1-(v-0.5)/0.5],['max',(v-0.5)/0.5]]};
+function addT(V,t,w,sc){if(!t||!w)return;const f=w*(sc||1),I=t.idx,d=t.d;for(let k=0;k<I.length;k++){const i=I[k]*3;V[i]+=d[3*k]*f;V[i+1]+=d[3*k+1]*f;V[i+2]+=d[3*k+2]*f}}
+function hullPerim(P){
+  const n=P.length/2;if(n<3)return 0;
+  const id=[...Array(n).keys()].sort((a,b)=>P[2*a]-P[2*b]||P[2*a+1]-P[2*b+1]);
+  const cr=(o,a,b)=>(P[2*a]-P[2*o])*(P[2*b+1]-P[2*o+1])-(P[2*a+1]-P[2*o+1])*(P[2*b]-P[2*o]);
+  const L=[],U=[];
+  for(const i of id){while(L.length>=2&&cr(L[L.length-2],L[L.length-1],i)<=0)L.pop();L.push(i)}
+  for(let k=id.length-1;k>=0;k--){const i=id[k];while(U.length>=2&&cr(U[U.length-2],U[U.length-1],i)<=0)U.pop();U.push(i)}
+  const h=L.slice(0,-1).concat(U.slice(0,-1));let s=0;
+  for(let k=0;k<h.length;k++){const a=h[k],b=h[(k+1)%h.length];s+=Math.hypot(P[2*a]-P[2*b],P[2*a+1]-P[2*b+1])}
+  return s;
 }
-
-function makeSDF(P){
-  const {s,chA,chB,waA,waB,hiA,hiB,shA,neR,arR,thR,mus,lean,fat}=P;
-  const fem=P.fem,Y=v=>v*s,m=0.5+mus,def=clamp01(lean*1.25-0.2)*(0.55+0.45*mus)*(fem?0.45:1);
-  /* ── tronco: semiancho, frente y espalda según la altura ── */
-  const lerp=(a,b,t)=>a+(b-a)*t;
-  const ky=v=>Y(v);
-  const TA=prof([[ky(0.80),hiA*0.45],[ky(0.83),hiA*0.78],[ky(0.865),hiA*0.95],[ky(0.90),hiA],[ky(0.955),hiA*0.955],[ky(1.01),lerp(hiA,waA,0.72)+fat*0.012],[ky(1.075),waA],[ky(1.15),lerp(waA,chA,0.42)],[ky(1.22),lerp(waA,chA,0.82)],[ky(1.285),chA],[ky(1.33),chA*0.985],[ky(1.39),chA*0.93],[ky(1.43),chA*0.84],[ky(1.47),0.135*s],[ky(1.50),neR*1.45],[ky(1.525),neR*1.05],[ky(1.54),neR*0.9]]);
-  const TF=prof([[ky(0.80),hiB*0.28],[ky(0.835),hiB*0.5],[ky(0.87),hiB*0.62],[ky(0.91),hiB*0.70],[ky(0.97),lerp(hiB*0.74,waB*0.96,0.6)],[ky(1.03),waB*(0.98+0.12*fat)],[ky(1.075),waB*(1.0+0.1*fat)],[ky(1.15),lerp(waB,chB,0.25)],[ky(1.22),lerp(waB,chB,0.62)],[ky(1.30),chB*1.06],[ky(1.355),chB*1.04],[ky(1.42),chB*0.80],[ky(1.47),chB*0.50],[ky(1.53),neR*0.8]]);
-  const TB=prof([[ky(0.785),-hiB*0.62],[ky(0.815),-hiB*0.90],[ky(0.85),-hiB*1.04],[ky(0.89),-hiB*1.06],[ky(0.945),-hiB*0.94],[ky(0.995),-lerp(hiB*0.92,waB*0.86,0.5)],[ky(1.04),-waB*0.87],[ky(1.075),-waB*0.92],[ky(1.15),-lerp(waB,chB,0.5)*0.98],[ky(1.25),-chB*0.98],[ky(1.32),-chB*1.0],[ky(1.39),-chB*0.98],[ky(1.45),-chB*0.86],[ky(1.49),-0.072*s],[ky(1.53),-neR*1.05]]);
-  const yT0=ky(0.79),yT1=ky(1.54);
-  const torso=(x,y,z)=>{
-    const yc=y<yT0?yT0:y>yT1?yT1:y,a=TA(yc),f=TF(yc),k=TB(yc),c=(f+k)/2,b=(f-k)/2;
-    let d=ell2(x,z-c,a,b);
-    if(y<yT0)d=sqrt(max(d,0)**2+(yT0-y)**2);else if(y>yT1)d=sqrt(max(d,0)**2+(y-yT1)**2);
-    return d;
-  };
-  /* ── brazos (lado +x) ── */
-  const S=[shA-0.062,Y(1.418),-0.016],E=[S[0]+0.052,Y(1.118),-0.04],Wr=[E[0]+0.028,Y(0.868),-0.008];
-  const outA=norm3(E[1]-S[1],-(E[0]-S[0]),0);
-  const UA=limb(S,E,[outA[0],outA[1],0],
-    prof([[0,arR*1.02],[0.3,arR*1.0],[0.55,arR*(0.98+0.04*mus)],[0.85,arR*0.82],[1,arR*0.74]],64),
-    prof([[0,arR*0.84],[0.3,arR*0.82],[0.6,arR*(1.02+0.16*mus)],[0.85,arR*0.78],[1,arR*0.62]],64),
-    prof([[0,-arR*0.92],[0.3,-arR*(1.06+0.08*mus)],[0.6,-arR*0.98],[0.9,-arR*0.72],[1,-arR*0.68]],64));
-  const outF=norm3(Wr[1]-E[1],-(Wr[0]-E[0]),0);
-  const FA=limb(E,Wr,[outF[0],outF[1],0],
-    prof([[0,arR*0.76],[0.22,arR*(0.88+0.05*mus)],[0.55,arR*0.68],[1,arR*0.42]],64),
-    prof([[0,arR*0.72],[0.25,arR*(0.88+0.06*mus)],[0.6,arR*0.66],[1,arR*0.52]],64),
-    prof([[0,-arR*0.80],[0.25,-arR*0.84],[0.6,-arR*0.64],[1,-arR*0.50]],64));
-  /* ── piernas (lado +x) ── */
-  const J=[hiA*0.48,Y(0.93),-0.012],K=[0.084*s+hiA*0.05,Y(0.505),0.008],An=[0.09*s+hiA*0.05,Y(0.088),-0.028];
-  const cs=Math.sqrt(thR/0.089);
-  const TH=limb(J,K,[1,0,0],
-    prof([[0,thR*0.98],[0.3,thR*(1.0+0.03*mus)],[0.55,thR*0.92],[0.8,thR*0.74],[0.93,0.058*s],[1,0.052*s]],64),
-    prof([[0,thR*0.84],[0.32,thR*(1.04+0.06*mus)],[0.62,thR*0.88],[0.86,thR*0.66],[1,0.046*s]],64),
-    prof([[0,-thR*1.06],[0.25,-thR*1.02],[0.6,-thR*0.80],[0.9,-0.054*s],[1,-0.046*s]],64));
-  const CA=limb(K,An,[1,0,0],
-    prof([[0,0.048*s],[0.25,(0.06+0.008*mus)*s*cs],[0.5,0.049*s*cs],[0.82,0.031*s],[1,0.026*s]],64),
-    prof([[0,0.046*s],[0.3,0.040*s],[0.7,0.032*s],[1,0.026*s]],64),
-    prof([[0,-0.046*s],[0.25,-(0.08+0.01*mus)*s*cs],[0.5,-0.066*s*cs],[0.8,-0.036*s],[1,-0.028*s]],64));
-  const yHead=Y(1.664);
-  const f=function(px,py,pz){
-    const x=px<0?-px:px;
-    let d=1;
-    /* tronco y detalles */
-    if(py>Y(0.66)&&py<Y(1.66)){
-      d=torso(x,py,pz);
-      const yc=py<yT0?yT0:py>yT1?yT1:py,cz=(TF(yc)+TB(yc))/2,front=sst(-0.005,0.03,pz-cz),back=1-sst(-0.03,0.005,pz-cz);
-      /* pectorales: borde inferior marcado que sube hacia la axila, se funden arriba */
-      if(fem&&x<0.2*s&&py>Y(1.12)&&py<Y(1.45)){
-        const b=P.bust,cz=TF(Y(1.28))-0.03,r=0.05+0.014*b;
-        d=smin(d,ell(x-0.085*s,py-Y(1.285),pz-cz,r*1.1,r*0.92,r*0.6),0.06);
-      }
-      if(!fem&&x<0.19*s&&py>Y(1.23)&&py<Y(1.46)&&front>0){
-        const yl=Y(1.262)+0.04*s*(x/(0.15*s))**2;
-        const ex=(0.45+0.55*sst(0,0.03*s,x))*(1-sst(0.13*s,0.185*s,x));
-        const ey=sst(yl-0.012-0.01*fat,yl+0.03+0.012*fat,py)*(1-sst(Y(1.34),Y(1.45),py));
-        d-=(0.008+0.009*mus)*ex*ey*front;
-      }
-      /* abdominales: dos columnas con tres intersecciones */
-      if(def>0.03&&x<0.09*s&&py>Y(0.96)&&py<Y(1.26)&&front>0){
-        const u=x/(0.078*s),col=u<1?Math.sin(PI*u)**0.8:0;
-        let seg=1;for(const yy of [1.205,1.137,1.068]){const q=(py-Y(yy))/0.013;seg-=0.6*Math.exp(-q*q)}
-        const win=sst(Y(0.98),Y(1.06),py)*(1-sst(Y(1.215),Y(1.255),py));
-        const cen=1-Math.exp(-sq(x/0.011))*0.7;
-        d-=(0.0022+0.0032*def)*col*seg*win*cen*front;
-      }
-      /* ombligo */
-      if(x<0.03&&py>Y(1.025)&&py<Y(1.08)&&front>0)d=smax(d,-ell(x,py-Y(1.05),pz-TF(Y(1.05))-0.004,0.006,0.009,0.009),0.008);
-      /* línea en V hacia la ingle */
-      if(def>0.15&&py>Y(0.84)&&py<Y(1.04)&&front>0){
-        const ax0=0.125*s,ay0=Y(1.0),bx0=0.04*s,by0=Y(0.855),vx=bx0-ax0,vy=by0-ay0,t0=clamp01(((x-ax0)*vx+(py-ay0)*vy)/(vx*vx+vy*vy)),dx=x-ax0-vx*t0,dy=py-ay0-vy*t0,dl=sqrt(dx*dx+dy*dy);
-        d+=0.0014*def*Math.exp(-sq(dl/0.011))*front;
-      }
-      /* michelines */
-      if(fat>0.2&&py>Y(0.9)&&py<Y(1.1)){const f=(fat-0.2)/0.8;d=smin(d,ell(x-waA*0.9,py-Y(0.995),pz+0.012,0.025+0.03*f,Y(0.045),0.06+0.02*f),0.05)}
-      /* espalda: columna, lumbares y omóplatos */
-      if(back>0&&py>Y(0.92)&&py<Y(1.46)){
-        const win=sst(Y(0.94),Y(1.02),py)*(1-sst(Y(1.38),Y(1.45),py));
-        d+=(0.0018+0.0018*lean)*Math.exp(-sq(x/0.016))*win*back;
-        d-=(0.003+0.004*mus)*Math.exp(-sq((x-0.032*s)/0.016))*sst(Y(0.95),Y(1.03),py)*(1-sst(Y(1.12),Y(1.2),py))*back;
-        const sx=(x-0.085*s)/(0.055*s),sy=(py-Y(1.35))/(0.07*s);d-=0.006*Math.exp(-(sx*sx+sy*sy))*back;
-      }
-      /* glúteos: separación */
-      if(back>0&&x<0.03&&py>Y(0.78)&&py<Y(0.95))d+=0.006*Math.exp(-sq(x/0.007))*sst(Y(0.80),Y(0.84),py)*(1-sst(Y(0.89),Y(0.94),py))*back;
-    }
-    /* cuello y cabeza */
-    if(py>Y(1.36)){
-      d=smin(d,cap(px,py,pz,0,Y(1.44),-0.018,0,Y(1.585),0.002,neR*1.1),0.035);
-      if(py>Y(1.47)){
-        const cr=ell(px,py-yHead,pz+0.008*s,0.081*s,0.108*s,0.101*s);
-        const jw=ell(px,py-Y(1.592),pz-0.03*s,0.06*s,0.054*s,0.071*s);
-        let h=smin(cr,jw,0.045);
-        h=smin(h,ell(px,py-Y(1.64),pz-0.084*s,0.009*s,0.022*s,0.013*s),0.02); /* nariz */
-        h=smin(h,ell(x-0.075*s,py-Y(1.645),pz+0.008*s,0.011*s,0.03*s,0.02*s),0.01); /* orejas */
-        d=smin(d,h,0.022);
-      }
-    }
-    /* brazos */
-    if(x>shA-0.24&&py>Y(0.55)&&py<Y(1.56)){
-      let a=UA(x,py,pz);
-      a=smin(a,ell(x-(shA-0.05),py-Y(1.372),pz+0.002,0.05+0.012*mus,0.08*s,0.056+0.01*mus),0.06); /* deltoides */
-      a=smin(a,FA(x,py,pz),0.028);
-      if(py<Y(0.93)){
-        const hx=Wr[0]+0.006,hy=Wr[1];
-        const ca=0.82,sa=0.57,rx=(x-hx)*ca-(pz-0.004)*sa,rz=(x-hx)*sa+(pz-0.004)*ca;
-        let hd=ell(rx,py-hy+0.056,rz,0.022,0.058,0.046);
-        hd=smin(hd,ell(rx-0.004,py-hy+0.135,rz+0.002,0.016,0.055,0.04),0.03);
-        hd=smin(hd,cap(x,py,pz,hx-0.004,hy-0.03,pz>0?0.03:0.03,hx-0.008,hy-0.085,0.05,0.0095),0.016);
-        a=smin(a,hd,0.022);
-      }
-      d=smin(d,a,0.04);
-    }
-    /* piernas */
-    if(py<Y(1.10)){
-      let l=TH(x,py,pz);
-      l=smin(l,ell(x-K[0]+0.022*s,py-Y(0.59),pz-0.018,0.032+0.008*mus,0.055*s,0.036),0.03); /* vasto interno */
-      l=smin(l,ell(x-K[0],py-K[1]-0.01,pz-0.03,0.03,0.034,0.012),0.035); /* rótula */
-      l=smin(l,CA(x,py,pz),0.035);
-      if(py<Y(0.16)){
-        let f=cap(x,py,pz,An[0],Y(0.045),-0.03,An[0]+0.014,Y(0.028),0.13*s,0.032);
-        f=smin(f,ell(x-An[0],py-Y(0.04),pz+0.045,0.033,0.038,0.04),0.03);
-        f=smax(f,-py+0.002,0.004);
-        l=smin(l,f,0.035);
-      }
-      d=smin(d,l,0.055);
-    }
-    return d;
-  };
-  /* región muscular de un punto de la superficie (para el mapa de recuperación)
-     0 nada, 1 pecho, 2 espalda, 3 hombro, 4 bíceps, 5 tríceps, 6 antebrazo, 7 abdomen,
-     8 trapecio, 9 glúteo, 10 cuádriceps, 11 femoral, 12 gemelo, 13 cuello */
-  f.region=(px,py,pz)=>{
-    /* devuelve id + peso (0-1): el peso dibuja la forma del músculo y se difumina en los bordes */
-    const x=px<0?-px:px,yn=py/s,R=(id,w)=>id+0.999*(w<0?0:w>1?1:w);
-    const sg=(dx,dy,rx,ry)=>{const q=dx*dx/(rx*rx)+dy*dy/(ry*ry);return Math.exp(-q*q)};
-    const glute=()=>R(9,sg(x-0.08*s,py-Y(0.885),0.1*s,0.085*s));
-    if(yn>1.575||yn<0.11)return 0;
-    if(x>Wr[0]-0.045&&py<Wr[1]+0.012)return 0;
-    const dT=(yn>0.7&&yn<1.6)?torso(x,py,pz):9,arm=x>shA-0.24&&yn>0.75;
-    const dUA=arm&&yn>0.95?UA(x,py,pz):9,dFA=arm&&yn<1.3?FA(x,py,pz):9;
-    const dTH=yn<1.08?TH(x,py,pz):9,dCA=yn<0.62?CA(x,py,pz):9;
-    const dx=x-(shA-0.05),dy=py-Y(1.372),dz=pz-0.002,rx=0.05+0.012*mus,ry=0.08*s,rz=0.056+0.01*mus;
-    const dD=(yn>1.22&&x>shA-0.17)?ell(dx,dy,dz,rx,ry,rz):9;
-    const dN=yn>1.42?cap(px,py,pz,0,Y(1.44),-0.018,0,Y(1.585),0.002,neR*1.1):9;
-    let m=dT,r=0;
-    if(dD<m){m=dD;r=1}if(dUA<m){m=dUA;r=2}if(dFA<m){m=dFA;r=3}if(dTH<m){m=dTH;r=4}if(dCA<m){m=dCA;r=5}if(dN<m-0.004){m=dN;r=6}
-    if(r===1){const k=sqrt(dx*dx/(rx*rx)+dy*dy/(ry*ry)+dz*dz/(rz*rz));return R(3,1-sst(0.75,1.3,k))}
-    if(r===2){const t=(S[1]-py)/(S[1]-E[1]);if(t<0.18)return R(3,0.8);const az=S[2]+(E[2]-S[2])*t,w=sst(0.15,0.36,t)*(1-sst(0.78,0.97,t));return pz>az?R(4,w):R(5,w)}
-    if(r===3){const t=(E[1]-py)/(E[1]-Wr[1]);return R(6,(1-sst(0.5,0.88,t))*sst(-0.05,0.1,t))}
-    if(r===4){const t=(J[1]-py)/(J[1]-K[1]);if(t>0.97)return 0;const az=J[2]+(K[2]-J[2])*t;
-      if(pz<az&&yn>0.79)return glute();
-      return pz>az-thR*0.2?R(10,sst(0.2,0.44,t)*(1-sst(0.8,0.96,t))):R(11,sst(0.22,0.44,t)*(1-sst(0.78,0.94,t)))}
-    if(r===5){const t=(K[1]-py)/(K[1]-An[1]);const az=K[2]+(An[2]-K[2])*t;return pz<az+0.006?R(12,sst(0.03,0.14,t)*(1-sst(0.48,0.74,t))):0}
-    if(r===6)return pz>-0.01?R(13,sst(Y(1.45),Y(1.49),py)*(1-sst(Y(1.55),Y(1.575),py))):R(8,1-sst(Y(1.53),Y(1.57),py));
-    const yc=py<yT0?yT0:py>yT1?yT1:py,fF=TF(yc),fB=TB(yc),c=(fF+fB)/2,rel=(pz-c)/((fF-fB)/2||1);
-    const front=rel>0.1,back=rel<-0.1,yl=Y(1.262)+0.04*s*(x/(0.15*s))**2;
-    if(yn>1.45)return front&&x<neR*1.5?R(13,1-sst(Y(1.5),Y(1.54),py)):R(8,1-sst(shA-0.11,shA-0.05,x));
-    if(front){
-      if(py>yl-0.012)return R(1,sg(x-0.072*s,py-Y(1.335),0.088*s,0.072*s)*sst(yl-0.012,yl+0.012,py)*sst(0,0.012*s,x));
-      if(yn>0.95)return R(7,sg(x-0.035*s,py-Y(1.105),0.068*s,0.135*s)*(1-sst(yl-0.03,yl-0.008,py)));
-      return 0;
-    }
-    if(back){
-      const tr=sg(x,py-Y(1.415),0.14*s,0.075*s),lat=Math.max(sg(x-0.095*s,py-Y(1.215),0.11*s,0.15*s),0.75*sg(x-0.03*s,py-Y(1.03),0.04*s,0.075*s));
-      if(yn>1.3&&tr>lat)return R(8,tr);
-      if(yn>0.975)return R(2,lat);
-      if(yn>0.78)return glute();
-      return 0;
-    }
-    /* costados */
-    if(yn>1.06&&yn<1.36)return R(2,0.85*(1-sst(Y(1.3),Y(1.37),py)));
-    if(yn>0.95&&yn<=1.06)return R(7,0.5);
-    if(yn>0.8&&yn<0.95)return glute();
+function slice(V,E,F,bit,p,n){
+  const nl=Math.hypot(n[0],n[1],n[2]),nx=n[0]/nl,ny=n[1]/nl,nz=n[2]/nl;
+  let ux,uy,uz;if(abs(nz)<0.9){ux=ny;uy=-nx;uz=0}else{ux=0;uy=nz;uz=-ny}
+  const ul=Math.hypot(ux,uy,uz);ux/=ul;uy/=ul;uz/=ul;
+  const vx=ny*uz-nz*uy,vy=nz*ux-nx*uz,vz=nx*uy-ny*ux,P=[];
+  for(let e=0;e<E.length;e+=2){const a=E[e],b=E[e+1];if(!(F[a]&bit)||!(F[b]&bit))continue;
+    const ax=V[3*a]-p[0],ay=V[3*a+1]-p[1],az=V[3*a+2]-p[2],bx=V[3*b]-p[0],by=V[3*b+1]-p[1],bz=V[3*b+2]-p[2];
+    const da=ax*nx+ay*ny+az*nz,db=bx*nx+by*ny+bz*nz;if(da*db>=0)continue;
+    const t=da/(da-db),x=ax+(bx-ax)*t,y=ay+(by-ay)*t,z=az+(bz-az)*t;P.push(x*ux+y*uy+z*uz,x*vx+y*vy+z*vz)}
+  return hullPerim(P);
+}
+function cen(V,ids){let x=0,y=0,z=0;for(const i of ids){x+=V[3*i];y+=V[3*i+1];z+=V[3*i+2]}const n=ids.length;return [x/n,y/n,z/n]}
+function build(A,m){
+  if(!A.E)A.E=edges(A);
+  const E=A.E,F=A.flags,nv=A.nv,J=A.joints,fem=m.sex==='m';
+  const bf=m.bf!=null?m.bf:(fem?25:16),lean=fem?Math.min(1,Math.max(0,(32-bf)/16)):Math.min(1,Math.max(0,(22-bf)/14));
+  const Hm=(m.height||(fem?165:178))/100;
+  const shape=(mus,wgt)=>{const V=A.base.slice();addT(V,A.T.race,1);
+    for(const [mk,a] of tri3(mus))for(const [wk,b] of tri3(wgt))addT(V,A.T[`u-${mk}-${wk}`],a*b);
+    addT(V,A.T.detail,Math.min(1,Math.max(0,mus*1.2-0.2))*(0.4+0.6*lean)*0.6);return V};
+  let sc=1;
+  const place=V=>{let lo=1e9,hi=-1e9;for(let i=0;i<A.nb;i++){const y=V[3*i+1];if(y<lo)lo=y;if(y>hi)hi=y}sc=Hm/((hi-lo)*0.1);
+    for(let i=0;i<nv;i++){V[3*i]*=0.1*sc;V[3*i+1]=(V[3*i+1]-lo)*0.1*sc;V[3*i+2]*=0.1*sc}return V};
+  const pose=V0=>{const V=V0.slice();
+    for(const [s,sg,W] of [['l',1,A.armL],['r',-1,A.armR]]){
+      const sh=cen(V,J[`joint-${s}-shoulder`]),el=cen(V,J[`joint-${s}-elbow`]);
+      const ang=Math.atan2(abs(el[0]-sh[0]),-(el[1]-sh[1])),a=-(ang-(m.armang||15)*Math.PI/180)*sg,c=Math.cos(a),sn=Math.sin(a);
+      for(let i=0;i<nv;i++){const w=W[i]/255;if(!w)continue;const x=V[3*i]-sh[0],y=V[3*i+1]-sh[1];
+        V[3*i]+=(sh[0]+x*c-y*sn-V[3*i])*w;V[3*i+1]+=(sh[1]+x*sn+y*c-V[3*i+1])*w}}
+    return V};
+  const meas=(V,k)=>{
+    const Y=i=>V[3*i+1];
+    if(k==='chest')return slice(V,E,F,1,[0,Y(A.lm.nipple),0],[0,1,0]);
+    if(k==='waist')return slice(V,E,F,1,[0,Y(A.lm.navel),0],[0,1,0]);
+    if(k==='hip')return slice(V,E,F,1,[0,Y(A.lm.butt),0],[0,1,0]);
+    if(k==='shoulders'){const P=pose(V),sh=cen(P,J['joint-l-shoulder']);return slice(P,E,F,65,[0,sh[1]-0.05,0],[0,1,0])}
+    if(k==='neck'){const a=cen(V,J['joint-neck']),b=cen(V,J['joint-head']);return slice(V,E,F,16,a.map((v,i)=>v+(b[i]-v)*0.28),b.map((v,i)=>v-a[i]))}
+    if(k==='arm'){const a=cen(V,J['joint-l-shoulder']),b=cen(V,J['joint-l-elbow']);return slice(V,E,F,2,a.map((v,i)=>v+(b[i]-v)*0.55),b.map((v,i)=>v-a[i]))/0.93}
+    if(k==='thigh'){const a=cen(V,J['joint-l-upper-leg']),b=cen(V,J['joint-l-knee']);return slice(V,E,F,8,a.map((v,i)=>v+(b[i]-v)*0.3),[0,1,0])}
     return 0;
   };
-  return f;
-}
-
-function mesh(sdf,P,h){
-  const H=P.H,x0=-(P.shA+0.14),x1=-x0,y0=-0.01,y1=H+0.02,z0=-0.21,z1=0.24;
-  const nx=Math.ceil((x1-x0)/h)+1,ny=Math.ceil((y1-y0)/h)+1,nz=Math.ceil((z1-z0)/h)+1;
-  const N=nx*ny*nz,F=new Float32Array(N);
-  const B=4,bd=B*h*1.8;
-  for(let k=0;k<nz;k+=B)for(let j=0;j<ny;j+=B)for(let i=0;i<nx;i+=B){
-    const cx=x0+(i+B/2)*h,cy=y0+(j+B/2)*h,cz=z0+(k+B/2)*h,dc=sdf(cx,cy,cz);
-    const k2=min(k+B,nz),j2=min(j+B,ny),i2=min(i+B,nx);
-    if(abs(dc)>bd*1.3){for(let kk=k;kk<k2;kk++)for(let jj=j;jj<j2;jj++){let o=i+nx*(jj+ny*kk);for(let ii=i;ii<i2;ii++)F[o++]=dc}continue}
-    for(let kk=k;kk<k2;kk++){const z=z0+kk*h;for(let jj=j;jj<j2;jj++){const y=y0+jj*h;let o=i+nx*(jj+ny*kk);for(let ii=i;ii<i2;ii++)F[o++]=sdf(x0+ii*h,y,z)}}
-  }
-  const vid=new Int32Array(N).fill(-1),pos=[];
-  const R=[1,nx,nx*ny];
-  const E=[[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]];
-  const C=[[0,0,0],[1,0,0],[0,1,0],[1,1,0],[0,0,1],[1,0,1],[0,1,1],[1,1,1]];
-  const off=C.map(q=>q[0]+q[1]*nx+q[2]*nx*ny);
-  const v=new Float32Array(8);
-  for(let k=0;k<nz-1;k++)for(let j=0;j<ny-1;j++)for(let i=0;i<nx-1;i++){
-    const b=i+nx*(j+ny*k);let mask=0;
-    for(let c=0;c<8;c++){v[c]=F[b+off[c]];if(v[c]<0)mask|=1<<c}
-    if(mask===0||mask===255)continue;
-    let sx=0,sy=0,sz=0,n=0;
-    for(let e=0;e<12;e++){const a=E[e][0],ee=E[e][1],va=v[a],ve=v[ee];if((va<0)===(ve<0))continue;const t=va/(va-ve),A=C[a],Bq=C[ee];sx+=A[0]+(Bq[0]-A[0])*t;sy+=A[1]+(Bq[1]-A[1])*t;sz+=A[2]+(Bq[2]-A[2])*t;n++}
-    vid[b]=pos.length/3;pos.push(x0+(i+sx/n)*h,y0+(j+sy/n)*h,z0+(k+sz/n)*h);
-  }
-  const idx=[];
-  for(let k=1;k<nz-1;k++)for(let j=1;j<ny-1;j++)for(let i=1;i<nx-1;i++){
-    const b=i+nx*(j+ny*k),f0=F[b];
-    for(let ax=0;ax<3;ax++){
-      const f1=F[b+R[ax]];if((f0<0)===(f1<0))continue;
-      const u=R[(ax+1)%3],w=R[(ax+2)%3];
-      const a=vid[b],bb=vid[b-u],c=vid[b-u-w],dd=vid[b-w];
-      if(a<0||bb<0||c<0||dd<0)continue;
-      if(f0<0)idx.push(a,bb,c,a,c,dd);else idx.push(a,c,bb,a,dd,c);
+  const keys=['chest','waist','hip','arm','thigh','neck','shoulders'].filter(k=>m[k]!=null);
+  const wb=m.wgt!=null?m.wgt:0.5;
+  let best=null;
+  if(keys.length){
+    for(const mu of [0.15,0.35,0.55,0.75,0.95])for(const wg of [0.1,0.3,0.5,0.7,0.9]){
+      const Vt=place(shape(mu,wg));let err=0;
+      for(const k of keys){const r=(meas(Vt,k)*100-m[k])/m[k];err+=r*r}
+      err+=0.02*(wg-wb)*(wg-wb);
+      if(!best||err<best[0])best=[err,mu,wg];
     }
+  }else best=[0,m.mus!=null?m.mus:0.5,wb];
+  let V=place(shape(best[1],best[2]));
+  const FIT=[['shoulders','m-shoulders'],['chest','m-chest'],['waist','m-waist'],['hip','m-hip'],['neck','m-neck'],['arm','m-arm'],['thigh','m-thigh']];
+  for(let it=0;it<2;it++)for(const [k,t] of FIT){
+    if(m[k]==null)continue;const goal=m[k]/100,c0=meas(V,k),tg=A.T[t+(goal>c0?'-incr':'-decr')];if(!tg)continue;
+    const V1=V.slice();addT(V1,tg,1,0.1*sc);const c1=meas(V1,k);if(abs(c1-c0)<1e-5)continue;
+    const w=Math.min(0.8,Math.max(0,(goal-c0)/(c1-c0)));addT(V,tg,w,0.1*sc);
   }
-  const nv=pos.length/3,P3=new Float32Array(pos),Nn=new Float32Array(nv*3),AO=new Float32Array(nv),e=0.0012;
-  for(let q=0;q<nv;q++){
-    let x=P3[3*q],y=P3[3*q+1],z=P3[3*q+2];
-    const d=sdf(x,y,z),gx=sdf(x+e,y,z)-sdf(x-e,y,z),gy=sdf(x,y+e,z)-sdf(x,y-e,z),gz=sdf(x,y,z+e)-sdf(x,y,z-e),gl=sqrt(gx*gx+gy*gy+gz*gz)||1;
-    const nx_=gx/gl,ny_=gy/gl,nz_=gz/gl;x-=nx_*d;y-=ny_*d;z-=nz_*d;
-    P3[3*q]=x;P3[3*q+1]=y;P3[3*q+2]=z;Nn[3*q]=nx_;Nn[3*q+1]=ny_;Nn[3*q+2]=nz_;
-    let o=0,wgt=1;for(const hh of [0.01,0.025,0.05,0.09]){const dd=sdf(x+nx_*hh,y+ny_*hh,z+nz_*hh);o+=max(0,hh-dd)*wgt/hh;wgt*=0.62}
-    AO[q]=clamp01(1-o*0.5);
+  V=pose(V);
+  /* normales */
+  const T=A.tris,nt=T.length/3,N=new Float32Array(nv*3);
+  for(let f=0;f<nt;f++){const a=T[3*f],b=T[3*f+1],c=T[3*f+2];
+    const e1x=V[3*b]-V[3*a],e1y=V[3*b+1]-V[3*a+1],e1z=V[3*b+2]-V[3*a+2],e2x=V[3*c]-V[3*a],e2y=V[3*c+1]-V[3*a+1],e2z=V[3*c+2]-V[3*a+2];
+    const nx=e1y*e2z-e1z*e2y,ny=e1z*e2x-e1x*e2z,nz=e1x*e2y-e1y*e2x;
+    for(const v of [a,b,c]){N[3*v]+=nx;N[3*v+1]+=ny;N[3*v+2]+=nz}}
+  for(let i=0;i<nv;i++){const l=Math.hypot(N[3*i],N[3*i+1],N[3*i+2])||1;N[3*i]/=l;N[3*i+1]/=l;N[3*i+2]/=l}
+  /* sombra de contacto (nube de puntos) y cavidades entre músculos */
+  const R=0.07,cs=R,grid=new Map(),key=(x,y,z)=>((x+512)*1048576+(y+512)*1024+(z+512));
+  for(let i=0;i<nv;i++){const k=key(Math.floor(V[3*i]/cs),Math.floor(V[3*i+1]/cs),Math.floor(V[3*i+2]/cs));let a=grid.get(k);if(!a)grid.set(k,a=[]);a.push(i)}
+  /* área por vértice: la oclusión no depende de lo densa que sea la malla (cara, manos) */
+  const ar=new Float32Array(nv);
+  for(let f=0;f<nt;f++){const a=T[3*f],b=T[3*f+1],c=T[3*f+2];
+    const e1x=V[3*b]-V[3*a],e1y=V[3*b+1]-V[3*a+1],e1z=V[3*b+2]-V[3*a+2],e2x=V[3*c]-V[3*a],e2y=V[3*c+1]-V[3*a+1],e2z=V[3*c+2]-V[3*a+2];
+    const t=Math.hypot(e1y*e2z-e1z*e2y,e1z*e2x-e1x*e2z,e1x*e2y-e1y*e2x)/6;ar[a]+=t;ar[b]+=t;ar[c]+=t}
+  let am=0,an=0;for(let i=0;i<A.nb;i++)if(ar[i]>0){am+=ar[i];an++}am=am/(an||1);
+  for(let i=0;i<nv;i++)ar[i]/=am;
+  const ao=new Float32Array(nv);
+  for(let i=0;i<nv;i++){
+    const px=V[3*i]+N[3*i]*0.004,py=V[3*i+1]+N[3*i+1]*0.004,pz=V[3*i+2]+N[3*i+2]*0.004,gx=Math.floor(px/cs),gy=Math.floor(py/cs),gz=Math.floor(pz/cs);let occ=0;
+    for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)for(let dz=-1;dz<=1;dz++){const a=grid.get(key(gx+dx,gy+dy,gz+dz));if(!a)continue;
+      for(const j of a){const ex=V[3*j]-px,ey=V[3*j+1]-py,ez=V[3*j+2]-pz,L=sqrt(ex*ex+ey*ey+ez*ez);if(L>=R||L<1e-6)continue;
+        const cv=(ex*N[3*i]+ey*N[3*i+1]+ez*N[3*i+2])/L;if(cv>0)occ+=cv*(1-L/R)*ar[j]}}
+    ao[i]=1-min(1,occ/9);
   }
-  let reg=null,rw=null;if(sdf.region){reg=new Uint8Array(nv);rw=new Uint8Array(nv);for(let q=0;q<nv;q++){const v=sdf.region(P3[3*q],P3[3*q+1],P3[3*q+2]),id=Math.floor(v);reg[q]=id;rw[q]=Math.min(255,Math.round((v-id)/0.999*255))}}
-  return {pos:P3,nor:Nn,ao:AO,reg,rw,idx:nv>65535?new Uint32Array(idx):new Uint16Array(idx),H};
+  const lap=new Float32Array(nv*3),deg=new Uint16Array(nv);
+  for(let e=0;e<E.length;e+=2){const a=E[e],b=E[e+1];for(let k=0;k<3;k++){lap[3*a+k]+=V[3*b+k];lap[3*b+k]+=V[3*a+k]}deg[a]++;deg[b]++}
+  for(let i=0;i<nv;i++){if(!deg[i])continue;const cx=lap[3*i]/deg[i]-V[3*i],cy=lap[3*i+1]/deg[i]-V[3*i+1],cz=lap[3*i+2]/deg[i]-V[3*i+2];
+    const cv=(cx*N[3*i]+cy*N[3*i+1]+cz*N[3*i+2])*1000;ao[i]*=1-Math.min(0.35,Math.max(0,cv*0.09))+Math.min(0.06,Math.max(0,-cv*0.02))}
+  let W=0,Hh=0;for(let i=0;i<A.nb;i++){W=max(W,abs(V[3*i]));Hh=max(Hh,V[3*i+1])}
+  const anchors={};for(const k in A.anchors){const i=A.anchors[k];anchors[k]=[V[3*i],V[3*i+1],V[3*i+2]]}
+  return {pos:V,nor:N,ao,idx:A.tris.slice(),reg:A.reg.slice(),rw:A.rw.slice(),H:Hh,W:W+0.02,anchors,fit:{mus:best[1],wgt:best[2]}};
 }
-
-function anchors(P){
-  const s=P.s,Y=v=>v*s;
-  return {neck:[P.neR,Y(1.51),0.01],shoulders:[P.shA,Y(1.418),0],chest:[P.chA*0.5,Y(1.32),P.chB*0.95],arm:[-(P.shA+0.008),Y(1.27),-0.02],waist:[P.waA,Y(1.075),0],hip:[-P.hiA,Y(0.90),-0.02],thigh:[-(P.hiA*0.5+P.thR*0.95),Y(0.79),0]};
-}
-return {params,makeSDF,mesh,anchors};
+return {parse,build};
 };
-const Body3D=BODY3D_FACTORY();
+
 
 /* Render de la figura: WebGL2, luz de estudio en escala de grises.
    Modo calor: los músculos cansados resaltan (blanco en oscuro, tinta en claro). */
@@ -1656,7 +1500,7 @@ void main(){
   vec3 base=mix(uBase,uBaseHeat,uHeat);
   vec3 c=base*lit*ao*g;
   c+=sp*ao*(1.-.7*uHeat)+uRim*(fr*.42+back*.8)*mix(.5,1.,vO)*(1.-.65*uHeat);
-  float hh=clamp(vF*uHeat,0.,1.);
+  float hh=clamp(vF*uHeat*1.4,0.,1.);hh=hh*hh*(3.-2.*hh);
   vec3 hot=uHot*(.7+.3*wrap)*mix(.75,1.,vO);
   c=mix(c,hot,hh);
   c=c/(1.+c*.35);
@@ -1724,27 +1568,36 @@ function f3Init(){
   try{
     const c=document.createElement('canvas');c.className='f3-c';
     const st=BodyGL.create(c);if(!st)throw new Error('gl');
-    const src=`const Body3D=(${BODY3D_FACTORY.toString()})();onmessage=e=>{const {id,m,h}=e.data;const P=Body3D.params(m);const M=Body3D.mesh(Body3D.makeSDF(P),P,h);postMessage({id,pos:M.pos,nor:M.nor,ao:M.ao,idx:M.idx,reg:M.reg,rw:M.rw,H:M.H,W:P.shA+0.1,anchors:Body3D.anchors(P)},[M.pos.buffer,M.nor.buffer,M.ao.buffer,M.idx.buffer,M.reg.buffer,M.rw.buffer])}`;
+    const src=`const MHB=(${MHB_FACTORY.toString()})();const A={};onmessage=e=>{const q=e.data;try{if(q.asset){A[q.sex]=MHB.parse(q.asset);postMessage({id:q.id,ok:1});return}const M=MHB.build(A[q.m.sex],q.m);postMessage({id:q.id,...M},[M.pos.buffer,M.nor.buffer,M.ao.buffer,M.idx.buffer,M.reg.buffer,M.rw.buffer])}catch(err){postMessage({id:q.id,error:String(err&&err.message||err)})}}`;
     const w=new Worker(URL.createObjectURL(new Blob([src],{type:'text/javascript'})));
     w.onmessage=e=>{const r=F3.pending.get(e.data.id);if(r){F3.pending.delete(e.data.id);r(e.data)}};
     w.onerror=()=>{F3.ok=false;for(const r of F3.pending.values())r(null);F3.pending.clear()};
     c.addEventListener('webglcontextlost',e=>{e.preventDefault();F3.lost=true});
-    c.addEventListener('webglcontextrestored',()=>{F3.lost=false;try{F3.st=BodyGL.create(c);if(F3.cur){F3.st.set(0,F3.cur);F3.curKey=null}f3Kick()}catch(e){}});
+    c.addEventListener('webglcontextrestored',()=>{F3.lost=false;try{F3.st=BodyGL.create(c);if(F3.cur){F3.st.set(0,F3.cur);if(F3.where!=='body'){F3.st.heat=1;const h=recHeat(F3.cur,recState(Date.now()).L);if(h)F3.st.setHeat(0,h)}}f3Kick()}catch(e){}});
     F3.canvas=c;F3.st=st;F3.worker=w;F3.ok=true;
   }catch(e){F3.ok=false}
   return F3.ok;
 }
 const r05=v=>v==null?undefined:Math.round(v*2)/2;
+const f3Ask=(msg,tr)=>new Promise(res=>{const id=++F3.seq;F3.pending.set(id,res);F3.worker.postMessage({...msg,id},tr||[])});
+F3.assets={};
+function f3Asset(sex){
+  /* la malla del cuerpo se descarga una vez (unos 0,7 MB) y queda guardada en el móvil */
+  if(!F3.assets[sex])F3.assets[sex]=fetch(`mch-body-${sex}.bin`).then(r=>{if(!r.ok)throw new Error('red');return r.arrayBuffer()}).then(buf=>f3Ask({asset:buf,sex},[buf])).then(d=>{if(!d||d.error)throw new Error('malla');return true}).catch(e=>{delete F3.assets[sex];throw e});
+  return F3.assets[sex];
+}
 function f3Mesh(m){
   const key=JSON.stringify(m);
   if(F3.cache.has(key)){const v=F3.cache.get(key);F3.cache.delete(key);F3.cache.set(key,v);return Promise.resolve(v)}
-  return new Promise(res=>{const id=++F3.seq;F3.pending.set(id,d=>{if(d){F3.cache.set(key,d);if(F3.cache.size>4)F3.cache.delete(F3.cache.keys().next().value)}res(d)});F3.worker.postMessage({id,m,h:0.0095})});
+  return f3Asset(m.sex).then(()=>f3Ask({m})).then(d=>{if(!d||d.error)return null;F3.cache.set(key,d);if(F3.cache.size>4)F3.cache.delete(F3.cache.keys().next().value);return d}).catch(()=>null);
 }
-function f3Look(){const dark=matchMedia('(prefers-color-scheme: dark)').matches;return dark?{base:[.70,.70,.70],baseHeat:[.25,.25,.25],hot:[1,1,1],rim:[.85,.85,.85]}:{base:[.60,.60,.60],baseHeat:[.86,.86,.86],hot:[0,0,0],rim:[-.22,-.22,-.22]}}
+function f3Look(){const dark=matchMedia('(prefers-color-scheme: dark)').matches;return dark?{base:[.70,.70,.70],baseHeat:[.2,.2,.2],hot:[1,1,1],rim:[.85,.85,.85]}:{base:[.60,.60,.60],baseHeat:[.86,.86,.86],hot:[0,0,0],rim:[-.22,-.22,-.22]}}
 /* medidas de la figura: ahora, al empezar o con el objetivo de grasa */
+const MRANGE={neck:[25,60],shoulders:[80,170],chest:[65,160],arm:[18,60],waist:[50,160],hip:[65,170],thigh:[35,90],weight:[30,250]};
+const okM=(k,v)=>v!=null&&(!MRANGE[k]||(v>=MRANGE[k][0]&&v<=MRANGE[k][1]));
 function bodyMeasures(which){
   const cur={},first={};
-  for(const [k] of MEASURES){const e=lastOf(k);if(e)cur[k]=e[k];let f=null;for(const x of S.body)if(x[k]!=null&&(!f||x.date<f.date))f=x;if(f)first[k]=f[k]}
+  for(const [k] of MEASURES){const e=lastOf(k);if(e&&okM(k,e[k]))cur[k]=e[k];let f=null;for(const x of S.body)if(okM(k,x[k])&&(!f||x.date<f.date))f=x;if(f)first[k]=f[k]}
   const W=S.body.filter(e=>e.weight!=null).sort((a,b)=>a.date<b.date?-1:1);
   const base=which==='first'?{...first,weight:W[0]&&W[0].weight}:{...cur,weight:W.length?W[W.length-1].weight:undefined};
   const C=comp(base),m={sex:S.sex==='m'?'m':'h',height:S.height||undefined};
@@ -1758,6 +1611,10 @@ function bodyMeasures(which){
   if(C2&&C2.ffmi)m.mus=Math.round(Math.max(0,Math.min(1,(C2.ffmi-17.5)/7))*20)/20;
   else{const a=mm.arm,ch=mm.chest,wa=mm.waist,sh=mm.shoulders;let v=0.4,n=0,t=0;if(a){t+=(a-30)/12;n++}if(ch&&wa){t+=(ch/wa-1.08)/0.32;n++}if(sh&&wa){t+=(sh/wa-1.3)/0.4;n++}if(n)v=Math.max(0,Math.min(1,t/n));m.mus=Math.round(v*20)/20}
   if(which==='goal')m.mus=Math.min(1,(m.mus||0.4)+0.1);
+  /* grasa orientativa para la malla: por % de grasa o, si no hay, por el IMC */
+  const bfv=m.bf,wkg=mm.weight,hh=S.height;
+  if(bfv!=null)m.wgt=Math.round((S.sex==='m'?Math.min(1,Math.max(0.1,(bfv-12)/30+0.15)):Math.min(1,Math.max(0.1,(bfv-4)/30)))*20)/20;
+  else if(wkg&&hh){const bmi=wkg/((hh/100)**2);m.wgt=Math.round(Math.min(1,Math.max(0.1,(bmi-17)/17))*20)/20}
   return m;
 }
 const BF_GOAL=()=>S.sex==='m'?20:10;
@@ -1765,11 +1622,13 @@ function goalBody(b){
   if(!S.height||b.waist==null||b.neck==null)return null;
   const C=comp(b);if(!C||!Number.isFinite(C.bf)||C.bf<=BF_GOAL()+0.5)return null;
   const h=S.height,D=495/(BF_GOAL()+450);let w;
-  if(S.sex==='m'){if(b.hip==null)return null;let hip=b.hip;for(let i=0;i<3;i++){w=Math.pow(10,(1.29579+0.221*Math.log10(h)-D)/0.35004)-hip+b.neck;hip=b.hip-0.5*(b.waist-w)}}
+  /* mujeres: cintura y cadera bajan juntas (sin pasar de 0,8 entre ellas); hombres: la cadera baja menos, pero sin quedar más ancha que la cintura / 0,86 */
+  let hipG=null;
+  if(S.sex==='m'){if(b.hip==null)return null;const sum=Math.pow(10,(1.29579+0.221*Math.log10(h)-D)/0.35004)+b.neck,r=Math.min(b.waist/b.hip,0.8);hipG=Math.min(b.hip,sum/(1+r));w=sum-hipG}
   else w=b.neck+Math.pow(10,(1.0324+0.15456*Math.log10(h)-D)/0.19077);
   const dw=b.waist-w;if(!(dw>0.4))return null;
   const m={...b,waist:w};
-  if(b.hip!=null)m.hip=b.hip-dw*(S.sex==='m'?0.5:0.35);if(b.chest!=null)m.chest=b.chest-dw*0.2;if(b.thigh!=null)m.thigh=b.thigh-dw*0.15;if(b.arm!=null)m.arm=b.arm-dw*0.04;if(b.shoulders!=null)m.shoulders=b.shoulders-dw*0.08;
+  if(b.hip!=null)m.hip=hipG!=null?hipG:Math.min(b.hip-dw*0.35,Math.max(w/0.86,b.hip-dw));const fem=S.sex==='m';if(b.chest!=null)m.chest=b.chest-dw*(fem?0.3:0.2);if(b.thigh!=null)m.thigh=b.thigh-dw*(fem?0.35:0.2);if(b.arm!=null)m.arm=b.arm-dw*(fem?0.1:0.05);if(b.shoulders!=null)m.shoulders=b.shoulders-dw*0.08;
   if(b.weight!=null&&C.lean)m.weight=C.lean/(1-BF_GOAL()/100);
   return {m,dw};
 }
@@ -1782,7 +1641,7 @@ function figure3d(){
   const modes=[diff?['first','Inicio']:null,['now','Ahora'],goal?['goal','Objetivo']:null].filter(Boolean);
   if(!modes.some(x=>x[0]===F3.mode))F3.mode='now';
   let labels='';
-  for(const [k,l] of MEASURES){const e=lastOf(k),[side,fy]=F3_LY[k];labels+=`<button class="sl ${side}" style="top:${(fy*100).toFixed(1)}%" data-act="measure" data-k="${k}"><span>${l}</span><b>${e?NF1.format(e[k])+' cm':'Añadir'}</b></button>`}
+  for(const [k,l] of MEASURES){const e=lastOf(k),[side,fy]=F3_LY[k],bad=e&&!okM(k,e[k]);labels+=`<button class="sl ${side}${bad?' bad':''}" style="top:${(fy*100).toFixed(1)}%" data-act="measure" data-k="${k}"><span>${l}</span><b>${e?(bad?'Revisar':NF1.format(e[k])+' cm'):'Añadir'}</b></button>`}
   return `<div class="f3${F3.mode==='now'?'':' alt'}" id="f3"><div class="f3-stage" id="f3s"><i class="f3-floor"></i><svg class="f3-l" id="f3l" aria-hidden="true"></svg>${labels}</div></div>
   ${modes.length>1?`<div class="seg f3-seg" role="group" aria-label="Qué cuerpo ver">${modes.map(([k,l])=>`<button data-act="f3mode" data-m="${k}" aria-pressed="${k===F3.mode}">${l}</button>`).join('')}</div><p class="f3-cap" id="f3cap">${f3Caption(goal)}</p>`:''}
   ${!S.seen3d&&has?`<p class="f3-hint" id="f3hint">Desliza para girar</p>`:''}`;
@@ -1803,11 +1662,12 @@ function f3Mount(){
   f3Bind(stage);
   const m=bodyMeasures(F3.mode)||bodyMeasures('now'),key=JSON.stringify(m);
   F3.want=key;
-  if(F3.cur&&F3.curKey===key){F3.anch=F3.cur.anchors;f3Kick();return}
+  if(F3.cur&&F3.curKey===key){F3.anch=F3.cur.anchors;F3.st.set(0,F3.cur);stage.classList.add('ready');f3Kick();return}
   stage.classList.add('loading');
   f3Mesh(m).then(M=>{
-    if(!M||F3.want!==key)return;
     const st=document.getElementById('f3s');
+    if(!M){if(st){st.classList.remove('loading');st.classList.add('failed')}return}
+    if(F3.want!==key)return;
     F3.cur=M;F3.curKey=key;F3.anch=M.anchors;F3.st.set(0,M);
     if(st){st.classList.remove('loading');st.classList.add('ready')}
     if(!F3.introDone&&!matchMedia('(prefers-reduced-motion: reduce)').matches){F3.introDone=true;F3.yaw=-0.7;F3.intro=true;F3.last=performance.now()}
@@ -2154,7 +2014,7 @@ function vSettings(){
     <input type="file" id="import-file" class="vh" tabindex="-1"></section>
   ${S.sample?`<section class="sec"><h2 class="h">Datos de ejemplo</h2><p class="help">Ahora ves una rutina y unos entrenos inventados para probar la app.</p><div class="form-acts"><button class="btn soft danger" data-act="clear-sample">Borrar datos de ejemplo</button></div></section>`:''}
   <div class="form-acts sec"><button class="btn soft danger" data-act="wipe">Borrar todos los datos</button></div>
-  <p class="small foot">MCH 3.1. Funciona sin conexión y no envía tus datos a ningún sitio. Tipografía: TeX Gyre Adventor, de GUST e-foundry.</p>`;
+  <p class="small foot">MCH 3.2. Funciona sin conexión y no envía tus datos a ningún sitio. Tipografía: TeX Gyre Adventor, de GUST e-foundry. Figura 3D basada en MakeHuman (dominio público).</p>`;
 }
 
 function vRoutine(){
@@ -2681,9 +2541,12 @@ const FORMS={
   measure:()=>{
     const c=cur(),v=toNum($('#m-val').value),W=c.k==='weight';
     if(!(v>(W?25:0)&&v<(W?300:400))){$('#m-val').focus();return toast(W?'Escribe tu peso en kilos.':'Escribe la medida en centímetros.')}
-    const d=isoDate(new Date());let e=S.body.find(x=>x.date===d);
-    if(!e){e={id:uid(),date:d,weight:null};S.body.push(e)}
-    e[c.k]=W?Math.round(v*100)/100:Math.round(v*10)/10;save();renderKeep();toast(W?'Peso guardado':'Medida guardada');
+    const keep=()=>{const d=isoDate(new Date());let e=S.body.find(x=>x.date===d);
+      if(!e){e={id:uid(),date:d,weight:null};S.body.push(e)}
+      e[c.k]=W?Math.round(v*100)/100:Math.round(v*10)/10;save();renderKeep();toast(W?'Peso guardado':'Medida guardada')};
+    if(!okM(c.k,v)){const l=W?'peso':(MEASURES.find(x=>x[0]===c.k)||[0,''])[1].toLowerCase();
+      return actionSheet('¿Seguro que es correcto?',`${W?kg(v)+' kg':NF1.format(v)+' cm'} de ${l} se sale de lo normal. Revisa que sea el contorno en centímetros.`,[{label:'Corregir',kind:'primary'},{label:'Guardar igualmente',kind:'soft',run:keep}])}
+    keep();
   },
   body:()=>{
     const c=cur(),date=$('#b-date').value;

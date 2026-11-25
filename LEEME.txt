@@ -6,8 +6,9 @@ CÓMO INSTALARLA GRATIS EN EL IPHONE
 1. Súbela a internet (gratis) con GitHub Pages. Mejor desde el ordenador:
    - Entra en github.com y crea una cuenta si no tienes.
    - Arriba a la derecha: "+" > New repository. Nombre: mch. Marca Public. Create repository.
-   - Pulsa "uploading an existing file" (o Add file > Upload files) y sube los 10 archivos
+   - Pulsa "uploading an existing file" (o Add file > Upload files) y sube los 12 archivos
      de esta carpeta, todos sueltos. Commit changes.
+     (mch-body-h.bin y mch-body-m.bin son la figura 3D: súbelos también.)
    - Settings > Pages > Branch: main, carpeta / (root) > Save.
    - En uno o dos minutos te dará tu dirección: https://TU-USUARIO.github.io/mch/
    El repositorio es público, pero tus entrenos no: se guardan solo en tu iPhone.

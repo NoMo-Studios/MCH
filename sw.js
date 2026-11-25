@@ -1,6 +1,7 @@
 /* MCH: guarda la app en el iPhone para que abra al instante y sin conexión.
    Al cambiar cualquier archivo, sube la versión para que se actualice. */
-const VERSION = 'mch-1.4.0';
+const VERSION = 'mch-1.5.0';
+const ASSETS = 'mch-assets-1'; // la malla 3D: no se borra al actualizar la app
 const FILES = [
   './',
   './index.html',
@@ -22,7 +23,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION && k !== ASSETS).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -48,9 +49,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  const store = url.pathname.endsWith('.bin') ? ASSETS : VERSION;
   event.respondWith(
     caches.match(req).then((hit) => hit || fetch(req).then((res) => {
-      if (res && res.ok) { const copy = res.clone(); caches.open(VERSION).then((c) => c.put(req, copy)); }
+      if (res && res.ok) { const copy = res.clone(); caches.open(store).then((c) => c.put(req, copy)); }
       return res;
     }))
   );
