@@ -189,6 +189,7 @@ button.row:active{opacity:.5}
 @media(min-width:520px){.year{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .how{margin-top:32px;padding:18px;border-radius:18px;background:var(--field)}
 .how-row{display:grid;grid-template-columns:92px minmax(0,1fr);gap:16px;align-items:start}
+.how-row.nofig{grid-template-columns:1fr}
 .how-fig{width:92px;height:auto;display:block}
 .how-fig .fg{fill:none;stroke:var(--ink-3);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
 .how-fig .zone{stroke:var(--blue);stroke-width:5;stroke-linecap:round}
@@ -216,6 +217,28 @@ button.row:active{opacity:.5}
 .sl.r{left:76%}.sl.l{right:76%;text-align:right}
 .sl b{font:400 16px var(--display);color:var(--ink);white-space:nowrap}
 .sl:active{opacity:.5}
+.kpi.wh{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:16px}
+.wstat,.hstat{display:grid;gap:4px;text-align:left;transition:opacity 160ms ease}
+.wstat:active,.hstat:active{opacity:.55}
+.hstat{text-align:right;padding-bottom:6px}
+.hv{font:400 28px var(--display)}.hv i{font-style:normal;font-size:16px;color:var(--ink-2);margin-left:4px}
+.lead0{font-size:17px;color:var(--ink-2)}
+.kd{margin-top:8px;font-size:15px}
+.form-acts.tight{margin-top:14px}
+.tiers{margin-top:18px}
+.t-tr{position:relative;height:10px}
+.t-seg{position:absolute;top:0;bottom:0;background:var(--field);border-left:2px solid var(--bg)}
+.t-seg:first-child{border-radius:5px 0 0 5px;border-left:0}.t-seg:last-of-type{border-radius:0 5px 5px 0}
+.t-seg.cur{background:var(--ink)}
+.t-seg.goal{background:color-mix(in srgb,var(--blue) 30%,var(--field))}
+.t-seg.goal.cur{background:var(--blue)}
+.t-lb{position:relative;height:40px;margin-top:8px}
+.t-lb span{position:absolute;top:0;font-size:11px;color:var(--ink-2);padding:0 2px 0 3px;line-height:1.2;overflow:hidden;white-space:nowrap;text-overflow:clip}
+.t-lb span b{font:400 12px var(--display);color:var(--ink-3)}
+.t-lb span.cur{color:var(--ink);font-weight:600}
+.t-lb span.gl{color:var(--blue)}
+.t-lb span b{display:block;font:400 11px var(--display);color:var(--ink-3)}
+.link.inl{min-height:0;display:inline;font-size:13px;text-decoration:underline}
 .vscale{margin-top:18px}
 .vs-tr{position:relative;height:10px;border-radius:5px;background:var(--field)}
 .vs-fill{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--ink)}
@@ -439,8 +462,10 @@ const INCS=[0.5,1,1.25,2,2.5,5];
 const TABS=['hoy','historial','progreso','cuerpo'];
 const FULL=['workout','day','item','exedit','bodyedit','pick','measure','compare'];
 const MEASURES=[['neck','Cuello'],['shoulders','Hombros'],['chest','Pecho'],['arm','Brazo'],['waist','Cintura'],['hip','Cadera'],['thigh','Muslo']];
-const MTIPS={neck:'Justo debajo de la nuez.',shoulders:'Por lo más ancho de los hombros, brazos relajados.',chest:'A la altura de los pezones, sin hinchar el pecho.',arm:'Bíceps flexionado, por lo más grueso.',waist:'A la altura del ombligo, en ayunas.',hip:'Por lo más saliente del glúteo.',thigh:'Justo debajo del glúteo, pierna relajada.'};
+const MTIPS={weight:'Por la mañana, en ayunas y después de ir al baño.',neck:'Justo debajo de la nuez.',shoulders:'Por lo más ancho de los hombros, brazos relajados.',chest:'A la altura de los pezones, sin hinchar el pecho.',arm:'Bíceps flexionado, por lo más grueso.',waist:'A la altura del ombligo, en ayunas.',hip:'Por lo más saliente del glúteo.',thigh:'Justo debajo del glúteo, pierna relajada.'};
 const MHOW={
+ weight:{steps:['Recién levantado, después de ir al baño: orinar y, si toca, hacer de vientre.','Antes de desayunar o beber nada, sin ropa o siempre con la misma.','En la misma báscula y en suelo duro, nunca sobre alfombra.'],err:'Pesarte a horas distintas o después de comer: el peso cambia 1-2 kg a lo largo del día.',all:'El peso sube y baja cada día por el agua, la sal y lo que comes. Pésate 3 o 4 mañanas por semana y fíjate en la tendencia de la gráfica, no en un día suelto. Después de un día de mucha sal o hidratos, es normal pesar 1 kg más sin haber ganado grasa.'},
+ height:{all:'Mídete por la mañana: a lo largo del día la columna se comprime y puedes medir hasta 1 cm menos.',steps:['Descalzo, de espaldas a una pared: talones, glúteos y espalda tocándola.','Mira al frente y apoya un libro plano sobre la cabeza, pegado a la pared.','Marca dónde queda el libro y mide desde el suelo hasta la marca.'],err:'Medirte con zapatillas o sin apoyar la espalda en la pared.'},
  neck:{steps:['Mira al frente con los hombros relajados.','Pasa la cinta justo por debajo de la nuez, un poco inclinada hacia abajo por delante.','Ajústala sin apretar y no tragues mientras lees el número.'],err:'Subir la cinta hacia la barbilla: el cuello sale más fino de lo que es.'},
  shoulders:{steps:['De pie, brazos sueltos a los lados, sin sacar pecho.','Pasa la cinta por la parte más ancha: por encima de los deltoides, lo que más sobresale visto de frente.','Hazlo frente al espejo o que te ayuden, para ver que va recta por delante y por detrás.'],err:'Encoger los hombros o separar los brazos: cambia varios centímetros.'},
  chest:{steps:['Brazos relajados a los lados.','Pasa la cinta a la altura de los pezones y, por la espalda, por debajo de las axilas.','Lee el número al final de una respiración normal, sin hinchar el pecho.'],err:'Medir con los pulmones llenos o con la cinta caída por la espalda.'},
@@ -456,9 +481,10 @@ function howFig(k){
 }
 function howTo(k){
   const h=MHOW[k];if(!h)return '';
-  return `<section class="how"><div class="how-row">${howFig(k)}<div><h2 class="h">Cómo medirlo</h2><ol class="how-steps">${h.steps.map(x=>`<li>${esc(x)}</li>`).join('')}</ol></div></div>
+  const fig=MEASURES.some(m=>m[0]===k);
+  return `<section class="how"><div class="how-row${fig?'':' nofig'}">${fig?howFig(k):''}<div><h2 class="h">${k==='weight'?'Cómo pesarte':'Cómo medirlo'}</h2><ol class="how-steps">${h.steps.map(x=>`<li>${esc(x)}</li>`).join('')}</ol></div></div>
   <p class="how-err"><b>Error típico:</b> ${esc(h.err)}</p>
-  <p class="help">Siempre: cinta flexible, ajustada sin hundir la piel y paralela al suelo. Mide a la misma hora y en las mismas condiciones. Mide dos veces: si te sale distinto, repite y apunta la media.</p></section>`;
+  <p class="help">${esc(h.all||'Siempre: cinta flexible, ajustada sin hundir la piel y paralela al suelo. Mide a la misma hora y en las mismas condiciones. Mide dos veces: si te sale distinto, repite y apunta la media.')}</p></section>`;
 }
 
 /* ───────── Utilidades ───────── */
@@ -939,14 +965,16 @@ function bodyGeo(m){
 }
 function crPath(P){let d=`M${P[0][0].toFixed(1)} ${P[0][1].toFixed(1)}`;for(let i=0;i<P.length-1;i++){const p0=P[i-1]||P[i],p1=P[i],p2=P[i+1],p3=P[i+2]||p2;d+=`C${(p1[0]+(p2[0]-p0[0])/6).toFixed(1)} ${(p1[1]+(p2[1]-p0[1])/6).toFixed(1)} ${(p2[0]-(p3[0]-p1[0])/6).toFixed(1)} ${(p2[1]-(p3[1]-p1[1])/6).toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`}return d}
 function crClosed(P){const n=P.length;let d=`M${P[0][0].toFixed(1)} ${P[0][1].toFixed(1)}`;for(let i=0;i<n;i++){const p0=P[(i-1+n)%n],p1=P[i],p2=P[(i+1)%n],p3=P[(i+2)%n];d+=`C${(p1[0]+(p2[0]-p0[0])/6).toFixed(1)} ${(p1[1]+(p2[1]-p0[1])/6).toFixed(1)} ${(p2[0]-(p3[0]-p1[0])/6).toFixed(1)} ${(p2[1]-(p3[1]-p1[1])/6).toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`}return d+'Z'}
-function bodyPaths(m,ghost){
+function bodyPaths(m,ghost,X0){
   const g=bodyGeo(m),c=200,n=g.neck,sh=Math.max(g.shoulders,g.chest+5),ch=g.chest,w=Math.min(g.waist,ch+3),hp=Math.max(g.hip,w+2),a=g.arm,t=g.thigh;
   const mir=P=>P.map(([x,y])=>[2*c-x,y]);
   const has=k=>m[k]!=null,cl=v=>Math.max(0,Math.min(1,v));
   const mus=cl(((has('arm')?(m.arm-31)/10:0.4)+(has('chest')&&has('waist')?(m.chest/m.waist-1.08)/0.32:0.4)+(has('shoulders')&&has('waist')?(m.shoulders/m.waist-1.3)/0.35:0.4))/3);
-  const lean=has('waist')?cl((92-m.waist)/18):0.35;
+  const X=X0||{};let lean=has('waist')?cl((92-m.waist)/18):0.35;if(X.bf!=null)lean=cl((19-X.bf)/9);
+  let musX=mus;if(X.ffmi!=null)musX=cl((X.ffmi-18.5)/6);
+  const lh=X.bf!=null?Math.max(0,Math.min(7,(X.bf-11)*0.6)):0;
   /* canon de 8 cabezas: cabeza 9-51, pezones ~98, ombligo ~136, entrepierna ~186, rodilla ~264, pies ~348 */
-  const TL=[[c-n,46],[c-n*1.05,57],[c-(n+sh)/2,62],[c-sh+14,65],[c-sh+9,72],[c-ch,90],[c-ch-1,104],[c-(ch+w)/2,121],[c-w,138],[c-(w+hp)/2-1,154],[c-hp,168],[c-hp+3,180]];
+  const TL=[[c-n,46],[c-n*1.05,57],[c-(n+sh)/2,62],[c-sh+14,65],[c-sh+9,72],[c-ch,90],[c-ch-1,104],[c-(ch+w)/2,121],[c-w,138],[c-(w+hp)/2-1-lh,154],[c-hp-lh*0.3,168],[c-hp+3,180]];
   const torso=crClosed([...TL,[c,187],...mir(TL).reverse()]);
   const ax=c-sh+a*1.0;
   const AL=[[c-sh+16,63],[c-sh+3,69],[c-sh-1,80],[c-sh+2,96],[ax-a,110],[ax-a*0.82+1,131],[ax-a*0.96+2,144],[ax-a*0.55+3,176],[ax-a*0.66+3,191],[ax-a*0.05+3,202],[ax+a*0.6+3,191],[ax+a*0.5+3,176],[ax+a*0.74+2,148],[ax+a*0.6+1,132],[ax+a*0.9,112],[c-ch+3,91],[c-sh+20,74]];
@@ -958,7 +986,7 @@ function bodyPaths(m,ghost){
   const fill=ghost?'':' class="fill"';
   let d=fo(crClosed(LL))+fo(crClosed(mir(LL)))+`<path d="${legOpen(LL)}${legOpen(mir(LL))}"/>`+fo(torso)+`<path d="${crPath(TL)}${crPath(mir(TL))}"/><path${fill} d="${crClosed(AL)}"/><path${fill} d="${crClosed(mir(AL))}"/><path${fill} d="${head}"/>`;
   if(!ghost){
-    const op=v=>`style="opacity:${(0.18+0.72*v).toFixed(2)}"`,M=[],A=[];
+    const op=v=>`style="opacity:${(0.12+0.78*v).toFixed(2)}"`,M=[],A=[];
     for(const s of [-1,1]){
       const X=x=>c+s*x,axs=c+s*(c-ax),lcs=c+s*(c-lc);
       M.push(`M${X(4)} 63Q${X(sh*0.5)} 64 ${X(sh-15)} 67`);
@@ -974,7 +1002,7 @@ function bodyPaths(m,ghost){
       A.push(`M${X(w*0.86)} 146Q${X(w*0.55)} 164 ${X(7)} 176`);
     }
     A.push(`M${c} 104L${c} 150`);
-    d+=`<path class="mus" ${op(mus)} d="${M.join('')}M${c} 72L${c} 100"/><path class="mus" ${op(lean*0.55+mus*0.45)} d="${A.join('')}"/>`;
+    d+=`<path class="mus" ${op(musX)} d="${M.join('')}M${c} 72L${c} 100"/><path class="mus" ${op(X.bf!=null?lean:lean*0.55+musX*0.45)} d="${A.join('')}"/>`;
   }
   const pts={neck:[c,56],shoulders:[c+sh,80],chest:[c+ch*0.5,96],waist:[c+w,138],arm:[ax,116],hip:[c-hp,168],thigh:[lc,214]};
   return {d,pts};
@@ -983,7 +1011,8 @@ const SIL_LY={neck:['r',30],shoulders:['r',88],chest:['r',146],waist:['r',204],a
 function silhouette(){
   const cur={},first={};let any=false,diff=false;
   for(const [k] of MEASURES){const e=lastOf(k);if(e){cur[k]=e[k];any=true}let f=null;for(const x of S.body)if(x[k]!=null&&(!f||x.date<f.date))f=x;if(f){first[k]=f[k];if(e&&f[k]!==e[k])diff=true}}
-  const now=bodyPaths(cur),old=diff?bodyPaths(first,true):null;
+  const wl=lastOf('weight'),wf=S.body.filter(e=>e.weight!=null).sort((a,b)=>a.date<b.date?-1:1)[0];
+  const now=bodyPaths(cur,false,comp({...cur,weight:wl&&wl.weight})),old=diff?bodyPaths(first,true,comp({...first,weight:wf&&wf.weight})):null;
   let lines='',labels='';
   for(const [k,l] of MEASURES){
     const [x,y]=now.pts[k],[side,ly]=SIL_LY[k],e=lastOf(k),right=side==='r',lx=right?304:96;
@@ -995,28 +1024,68 @@ function silhouette(){
 function vIndexV(){
   const sh=lastOf('shoulders'),wa=lastOf('waist');
   if(!sh||!wa)return `<p class="help">Mide el contorno de hombros y la cintura y aquí verás tu índice V: cuántas veces es más ancha tu espalda que tu cintura.</p><div class="btn-row gap">${!sh?`<button class="btn soft" data-act="measure" data-k="shoulders">Medir hombros</button>`:''}${!wa?`<button class="btn soft" data-act="measure" data-k="waist">Medir cintura</button>`:''}</div>`;
-  const r=sh.shoulders/wa.waist,lo=1.2,hi=1.8,pos=Math.max(0,Math.min(1,(r-lo)/(hi-lo)))*100,ideal=(1.6-lo)/(hi-lo)*100;
+  const r=sh.shoulders/wa.waist,lo=1.2,hi=1.9,P=v=>Math.max(0,Math.min(1,(v-lo)/(hi-lo)))*100;
+  const T=[[1.2,1.35,'Normal'],[1.35,1.5,'Entrenado'],[1.5,1.7,'V marcada'],[1.7,1.9,'Ideal']],ti=T.findIndex(x=>r<x[1]),tier=T[ti<0?3:ti];
   const pairs=S.body.filter(e=>e.shoulders!=null&&e.waist!=null).sort((a,b)=>a.date<b.date?-1:1);
-  const f=pairs[0],fr=f?f.shoulders/f.waist:null,d=fr!=null&&pairs.length>1?r-fr:null;
-  const msg=r>=1.6?'Ya estás en la V ideal o por encima.':`Te faltan ${NF.format(Math.round((1.6-r)*100)/100)} para la V ideal.`;
-  return `<div class="kpi"><p class="fig"><span class="fig-n${r>=1.6?' pos':''}">${NF.format(Math.round(r*100)/100)}</span></p><p class="muted">Hombros ${NF1.format(sh.shoulders)} ÷ cintura ${NF1.format(wa.waist)} cm. ${msg}${d!=null&&Math.abs(d)>=0.005?` ${sign(d)}${NF.format(Math.round(Math.abs(d)*100)/100)} desde el ${esc(F.short.format(dateNum(f.date)))}.`:''}</p></div>
-  <div class="vscale" role="img" aria-label="Índice V ${NF.format(Math.round(r*100)/100)} en una escala de 1,2 a 1,8; la V ideal es 1,6"><div class="vs-tr"><i class="vs-fill" style="width:${pos.toFixed(1)}%"></i><i class="vs-ideal" style="left:${ideal.toFixed(1)}%"></i><i class="vs-dot" style="left:${pos.toFixed(1)}%"></i></div><div class="vs-x"><span>1,2</span><span style="left:${ideal.toFixed(1)}%">1,6 ideal</span><span>1,8</span></div></div>
+  const f=pairs[0],fr=f?f.shoulders/f.waist:null,d=fr!=null&&pairs.length>1?r-fr:null,r2=x=>NF.format(Math.round(x*100)/100);
+  const msg=r>=1.7?'Estás en la zona ideal.':`Estás en ${tier[2].toLowerCase()}. Te faltan ${r2(1.7-r)} para el 1,7.`;
+  return `<div class="kpi"><p class="fig"><span class="fig-n${r>=1.7?' pos':''}">${r2(r)}</span></p><p class="muted">Hombros ${NF1.format(sh.shoulders)} ÷ cintura ${NF1.format(wa.waist)} cm. ${msg}${d!=null&&Math.abs(d)>=0.005?` ${sign(d)}${r2(Math.abs(d))} desde el ${esc(F.short.format(dateNum(f.date)))}.`:''}</p></div>
+  ${tierBar(r,T,P,'Índice V',(x,i)=>i?NF.format(x[0]):'')}
   ${pairs.length>1?chartBox('c-v',pairs.map(e=>({x:dateNum(e.date),y:Math.round(e.shoulders/e.waist*100)/100,d:`${NF1.format(e.shoulders)} ÷ ${NF1.format(e.waist)} cm`})),'x','Evolución del índice V'):''}`;
 }
+function tierBar(v,T,P,label,fmt,goal){
+  const n=T.length,ci=Math.max(0,T.findIndex(x=>v<x[1])<0?n-1:T.findIndex(x=>v<x[1])),g=goal==null?n-1:goal;
+  const lo=T[ci][0],hi=T[ci][1],pos=(ci+Math.max(0,Math.min(1,(v-lo)/(hi-lo))))/n*100;
+  return `<div class="tiers" role="img" aria-label="${esc(label)}: ${esc(T[ci][2])}"><div class="t-tr">${T.map((x,i)=>`<i class="t-seg${i===ci?' cur':''}${i===g?' goal':''}" style="left:${(i/n*100).toFixed(2)}%;width:${(100/n).toFixed(2)}%"></i>`).join('')}<i class="vs-dot" style="left:${pos.toFixed(1)}%"></i></div><div class="t-lb">${T.map((x,i)=>`<span class="${i===ci?'cur':''}${i===g?' gl':''}" style="left:${(i/n*100).toFixed(2)}%;width:${(100/n).toFixed(2)}%">${esc(x[2])}<b>${esc(fmt?fmt(x,i):'')}</b></span>`).join('')}</div></div>`;
+}
+function comp(m){
+  const w=m.weight,bf=m.waist!=null&&m.neck!=null&&S.height?navy(m.waist,m.neck,S.height):null;
+  if(bf==null||!Number.isFinite(bf))return null;
+  const r={bf};if(w){r.lean=w*(1-bf/100);r.fat=w-r.lean;const h=S.height/100;r.ffmi=r.lean/(h*h)+6.1*(1.8-h);r.muscle=r.lean*0.53}
+  return r;
+}
+/* % de grasa: método de la Marina de EE. UU. (hombres): cintura, cuello y altura */
+const navy=(waist,neck,h)=>waist>neck?495/(1.0324-0.19077*Math.log10(waist-neck)+0.15456*Math.log10(h))-450:null;
+function vFat(){
+  if(!S.height)return `<p class="help">Para estimarlo necesito tu altura. Ponla arriba, al lado de tu peso.</p><div class="btn-row gap"><button class="btn soft" data-act="measure" data-k="height">Añadir altura</button></div>`;
+  const wa=lastOf('waist'),ne=lastOf('neck');
+  if(!wa||!ne)return `<p class="help">Mide la cintura (a la altura del ombligo) y el cuello y aquí verás tu % de grasa estimado.</p><div class="btn-row gap">${!wa?`<button class="btn soft" data-act="measure" data-k="waist">Medir cintura</button>`:''}${!ne?`<button class="btn soft" data-act="measure" data-k="neck">Medir cuello</button>`:''}</div>`;
+  const bf=navy(wa.waist,ne.neck,S.height);if(bf==null)return '<p class="help">Revisa las medidas de cintura y cuello.</p>';
+  const T=[[3,10,'Ideal'],[10,13,'Definido'],[13,17,'En forma'],[17,24,'Normal'],[24,40,'Alto']],P=null;
+  const v=Math.round(bf*10)/10,tier=T.find(x=>v<x[1])||T[4];
+  const hist=S.body.filter(e=>e.waist!=null&&e.neck!=null).sort((a,b)=>a.date<b.date?-1:1).map(e=>({x:dateNum(e.date),y:Math.round(navy(e.waist,e.neck,S.height)*10)/10,d:`cintura ${NF1.format(e.waist)}, cuello ${NF1.format(e.neck)} cm`})).filter(p=>Number.isFinite(p.y));
+  const d=hist.length>1?hist[hist.length-1].y-hist[0].y:null;
+  const wt=lastOf('weight'),C=comp({waist:wa.waist,neck:ne.neck,weight:wt&&wt.weight});
+  const desc={Ideal:'Abdominales marcados y michelines casi inexistentes.',Definido:'Se ven los abdominales; pueden quedar algo de michelines.','En forma':'Abdominales poco marcados.',Normal:'No se ven los abdominales.',Alto:'Hay bastante margen para bajar.'}[tier[2]];
+  let goal='';
+  if(v>10){goal=`Te faltan ${NF1.format(Math.round((v-10)*10)/10)} puntos para el 10 %`;if(C&&C.lean){const kgx=wt.weight-C.lean/0.9;goal+=`: unos ${NF1.format(Math.round(kgx*10)/10)} kg de grasa, manteniendo tu músculo`}goal+='.'}else goal='Estás en la zona ideal.';
+  let h=`<div class="kpi"><p class="fig"><span class="fig-n${v<=10?' pos':''}">${NF1.format(v)}</span><span class="fig-u">%</span></p><p class="muted">${esc(desc)} ${esc(goal)}${d!=null&&Math.abs(d)>=0.1?` ${sign(d)}${NF1.format(Math.abs(Math.round(d*10)/10))} puntos desde el ${esc(F.short.format(hist[0].x))}.`:''}</p></div>
+  ${tierBar(v,T,P,'Grasa corporal',(x,i)=>i?NF.format(x[0])+' %':'<10 %',0)}
+  ${hist.length>1?chartBox('c-bf',hist,'pct','Evolución del % de grasa'):''}`;
+  if(C&&C.lean){
+    const FT=[[10,18,'Bajo'],[18,20,'Normal'],[20,22,'Entrenado'],[22,24,'Fuerte'],[24,30,'Élite']],ff=Math.round(C.ffmi*10)/10;
+    h+=`<h3 class="sh-h">Músculo y masa magra</h3><div class="stats">${stat(NF1.format(Math.round(C.lean*10)/10)+' kg',`Masa magra (${Math.round(100-v)} %)`)}${stat(NF1.format(Math.round(C.muscle*10)/10)+' kg',`Músculo aprox. (${Math.round(C.muscle/wt.weight*100)} %)`)}${stat(NF1.format(Math.round(C.fat*10)/10)+' kg','Grasa')}</div>
+    <p class="muted kd">FFMI ${NF1.format(ff)}: tu masa magra para tu altura. ${ff>=24?'Estás cerca del límite natural.':ff>=22?'Muy musculado.':ff>=20?'Se nota que entrenas.':'Con margen para ganar músculo.'}</p>
+    ${tierBar(ff,FT,null,'FFMI',(x,i)=>i?NF.format(x[0]):'',-1)}`;
+  }else h+=`<p class="help">Apunta tu peso para ver tu masa magra y tu músculo.</p>`;
+  return h+`<p class="help">El % de grasa se calcula con el método de la Marina de EE. UU. (cintura, cuello y altura: ${S.height} cm), con un margen de unos 3 puntos. La masa magra es todo lo que no es grasa (músculo, huesos, órganos y agua); el músculo es una aproximación, en torno a la mitad de la masa magra. Para cifras exactas hace falta una prueba como la DEXA.</p>`;
+}
 function vBody(){
-  let h=`<div class="top"><span class="sp"></span><button class="link" data-act="body-add">${icon('plus')}Añadir</button></div><h1 class="title">Cuerpo</h1>`;
+  let h=`<div class="top"></div><h1 class="title">Cuerpo</h1>`;
   const E=S.body.slice().sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
-  const W=E.filter(e=>e.weight!=null);
+  const W=E.filter(e=>e.weight!=null),hgt=`<button class="hstat" data-act="measure" data-k="height"><span class="muted">Altura</span><span class="hv">${S.height?`${S.height}<i>cm</i>`:'Añadir'}</span></button>`;
   if(W.length){
     const last=W[W.length-1],t30=dateNum(last.date)-30*DAY;
     let ref=null;for(const e of W)if(dateNum(e.date)<=t30)ref=e;
     if(!ref&&W.length>1)ref=W[0];
     const diff=ref?Math.round((last.weight-ref.weight)*10)/10:0,days=ref?Math.round((dateNum(last.date)-dateNum(ref.date))/DAY):0;
-    h+=`<div class="kpi"><p class="muted">Peso</p><p class="fig"><span class="fig-n">${kg(last.weight)}</span><span class="fig-u">kg</span></p><p class="muted">${ref&&ref!==last?(diff===0?`Igual que hace ${days} días`:`${sign(diff)}${kg(Math.abs(diff))} kg en ${days} días`):`Registrado el ${esc(F.short.format(dateNum(last.date)))}`}</p></div>`;
+    h+=`<div class="kpi wh"><button class="wstat" data-act="measure" data-k="weight"><span class="muted">Peso</span><span class="fig"><span class="fig-n">${kg(last.weight)}</span><span class="fig-u">kg</span></span></button>${hgt}</div><p class="muted kd">${ref&&ref!==last?(diff===0?`Igual que hace ${days} días`:`${sign(diff)}${kg(Math.abs(diff))} kg en ${days} días`):`Registrado el ${esc(F.short.format(dateNum(last.date)))}`}</p>`;
     if(W.length>1)h+=chartBox('c-body',W.map(e=>({x:dateNum(e.date),y:e.weight,d:''})),'kg','Evolución del peso');
-  }else h+=`<p class="lead">Apunta tu peso y tus medidas, por ejemplo una vez por semana, y aquí verás la tendencia.</p><div class="hero-acts"><button class="btn primary" data-act="body-add">Añadir peso</button></div>`;
+    h+=`<div class="form-acts tight"><button class="btn soft" data-act="measure" data-k="weight">${icon('plus')}Apuntar peso</button></div>`;
+  }else h+=`<div class="kpi wh"><div class="wstat"><span class="muted">Peso</span><span class="lead0">Aún sin apuntar</span></div>${hgt}</div><div class="form-acts tight"><button class="btn primary" data-act="measure" data-k="weight">${icon('plus')}Apuntar peso</button></div>`;
   h+=`<section class="sec"><div class="sec-head"><h2 class="h">Medidas</h2><span class="aux">Toca una zona</span></div>${silhouette()}</section>`;
   h+=`<section class="sec"><h2 class="h">Índice V</h2>${vIndexV()}</section>`;
+  h+=`<section class="sec"><h2 class="h">Grasa corporal</h2>${vFat()}</section>`;
   h+=`<section class="sec"><div class="sec-head"><h2 class="h">Fotos</h2><label class="link" for="photo-in">${icon('plus')}Añadir</label></div><input type="file" id="photo-in" accept="image/*" class="vh" tabindex="-1">
   <div id="photos" class="ph-grid"></div><p class="help">Mismo sitio, misma luz y misma postura cada vez. Las fotos se guardan solo en este iPhone y no van en la copia de seguridad.</p></section>`;
   if(E.length)h+=`<section class="sec"><h2 class="h">Registros</h2><ul class="list">${E.slice().reverse().slice(0,c_more?999:6).map(e=>{
@@ -1027,14 +1096,17 @@ function vBody(){
 }
 let c_more=false;
 function vMeasure(c){
-  const k=c.k,l=(MEASURES.find(m=>m[0]===k)||[k,k])[1];
+  const k=c.k;
+  if(k==='height')return `<div class="top">${backBtn('Cuerpo')}</div><h1 class="title">Altura</h1><p class="sub">Se usa para estimar tu % de grasa.</p>
+  <form class="form" data-form="height" novalidate><label class="field"><span>Tu altura</span><span class="unit-in"><input id="h-val" inputmode="numeric" autocomplete="off" value="${S.height||185}"><i>cm</i></span></label>${S.height?'':'<p class="mtip">En tu PDF pone 185 cm.</p>'}<div class="form-acts"><button class="btn primary" type="submit">Guardar</button></div></form>${howTo(k)}`;
+  const W=k==='weight',unit=W?'kg':'cm',fmt=x=>W?kg(x):NF1.format(x),l=W?'Peso':(MEASURES.find(m=>m[0]===k)||[k,k])[1];
   const v=S.body.filter(e=>e[k]!=null).sort((a,b)=>a.date<b.date?-1:1),a=v[v.length-1],b=v[v.length-2],f=v[0];
+  const df=x=>`${sign(x)}${fmt(Math.abs(Math.round(x*10)/10))} ${unit}`;
   let h=`<div class="top">${backBtn('Cuerpo')}</div><h1 class="title">${esc(l)}</h1><p class="sub">${esc(MTIPS[k]||'')}</p>`;
-  const guide=howTo(k);
-  if(a)h+=`<div class="kpi"><p class="fig"><span class="fig-n">${NF1.format(a[k])}</span><span class="fig-u">cm</span></p><p class="muted">${b?`${sign(a[k]-b[k])}${NF1.format(Math.abs(Math.round((a[k]-b[k])*10)/10))} cm desde la anterior. `:''}${v.length>1?`${sign(a[k]-f[k])}${NF1.format(Math.abs(Math.round((a[k]-f[k])*10)/10))} cm desde el ${esc(F.short.format(dateNum(f.date)))}.`:`Medido el ${esc(F.short.format(dateNum(a.date)))}.`}</p></div>`;
-  if(v.length>1)h+=chartBox('c-m',v.map(e=>({x:dateNum(e.date),y:e[k],d:''})),'cm',`Evolución de ${l}`);
-  h+=`<form class="form" data-form="measure" novalidate><label class="field"><span>Medida de hoy</span><span class="unit-in"><input id="m-val" inputmode="decimal" autocomplete="off" placeholder="${a?esc(NF1.format(a[k])):''}"><i>cm</i></span></label><div class="form-acts"><button class="btn primary" type="submit">Guardar</button></div></form>`+guide;
-  if(v.length)h+=`<section class="sec"><h2 class="h">Historial</h2><ul class="list">${v.slice().reverse().map(e=>`<li><button class="row" data-act="body-edit" data-id="${esc(e.id)}"><span class="main"><span class="t">${esc(cap(F.wd.format(dateNum(e.date))))}</span></span><span class="num">${NF1.format(e[k])} cm</span>${icon('right','i chev')}</button></li>`).join('')}</ul></section>`;
+  if(a)h+=`<div class="kpi"><p class="fig"><span class="fig-n">${fmt(a[k])}</span><span class="fig-u">${unit}</span></p><p class="muted">${b?`${df(a[k]-b[k])} desde la anterior. `:''}${v.length>1?`${df(a[k]-f[k])} desde el ${esc(F.short.format(dateNum(f.date)))}.`:`Del ${esc(F.short.format(dateNum(a.date)))}.`}</p></div>`;
+  if(v.length>1)h+=chartBox('c-m',v.map(e=>({x:dateNum(e.date),y:e[k],d:''})),unit,`Evolución de ${l}`);
+  h+=`<form class="form" data-form="measure" novalidate><label class="field"><span>${W?'Peso de hoy':'Medida de hoy'}</span><span class="unit-in"><input id="m-val" inputmode="decimal" autocomplete="off" placeholder="${a?esc(fmt(a[k])):''}"><i>${unit}</i></span></label><div class="form-acts"><button class="btn primary" type="submit">Guardar</button></div></form>`+howTo(k);
+  if(v.length)h+=`<section class="sec"><h2 class="h">Historial</h2><ul class="list">${v.slice().reverse().map(e=>`<li><button class="row" data-act="body-edit" data-id="${esc(e.id)}"><span class="main"><span class="t">${esc(cap(F.wd.format(dateNum(e.date))))}</span></span><span class="num">${fmt(e[k])} ${unit}</span>${icon('right','i chev')}</button></li>`).join('')}</ul></section>`;
   return h;
 }
 /* Fotos: en IndexedDB, solo en este iPhone */
@@ -1105,7 +1177,7 @@ function vSettings(){
     <input type="file" id="import-file" class="vh" tabindex="-1"></section>
   ${S.sample?`<section class="sec"><h2 class="h">Datos de ejemplo</h2><p class="help">Ahora ves una rutina y unos entrenos inventados para probar la app.</p><div class="form-acts"><button class="btn soft danger" data-act="clear-sample">Borrar datos de ejemplo</button></div></section>`:''}
   <div class="form-acts sec"><button class="btn soft danger" data-act="wipe">Borrar todos los datos</button></div>
-  <p class="small foot">MCH 1.9. Funciona sin conexión y no envía tus datos a ningún sitio. Tipografía: TeX Gyre Adventor, de GUST e-foundry.</p>`;
+  <p class="small foot">MCH 2.3. Funciona sin conexión y no envía tus datos a ningún sitio. Tipografía: TeX Gyre Adventor, de GUST e-foundry.</p>`;
 }
 
 function vRoutine(){
@@ -1216,7 +1288,7 @@ function niceStep(range,count){
   const raw=range/Math.max(1,count),p=Math.pow(10,Math.floor(Math.log10(raw))),f=raw/p;
   return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p;
 }
-const fmtVal=(v,unit)=>unit==='kg'?`${kg(v)} kg`:unit==='cm'?`${NF1.format(v)} cm`:unit==='x'?NF.format(v):`${v} reps`;
+const fmtVal=(v,unit)=>unit==='pct'?`${NF1.format(v)} %`:unit==='kg'?`${kg(v)} kg`:unit==='cm'?`${NF1.format(v)} cm`:unit==='x'?NF.format(v):`${v} reps`;
 function drawChart(c){
   const el=c.el,svg=el.querySelector('svg'),W=el.clientWidth,H=el.clientHeight;
   if(!W||!H)return;
@@ -1534,6 +1606,7 @@ const ACT={
     });
   },
   'body-add':()=>go({v:'bodyedit',id:null}),
+  'height-edit':()=>{S.height=null;save();renderKeep()},
   'body-more':()=>{c_more=true;renderKeep()},
   measure:d=>go({v:'measure',k:d.k}),
   compare:()=>go({v:'compare'}),
@@ -1595,12 +1668,13 @@ const FORMS={
     e.name=name;e.muscle=$('#e-muscle').value;e.inc=toNum($('#e-inc').value)||2.5;e.note=$('#e-note').value.trim();
     save();back();toast('Ejercicio guardado');
   },
+  height:()=>{const v=Math.round(toNum($('#h-val').value));if(!(v>=120&&v<=230)){$('#h-val').focus();return toast('Escribe tu altura en centímetros.')}S.height=v;save();if(cur().v==='measure')back();else renderKeep();toast('Altura guardada')},
   measure:()=>{
-    const c=cur(),v=toNum($('#m-val').value);
-    if(!(v>0&&v<400)){$('#m-val').focus();return toast('Escribe la medida en centímetros.')}
+    const c=cur(),v=toNum($('#m-val').value),W=c.k==='weight';
+    if(!(v>(W?25:0)&&v<(W?300:400))){$('#m-val').focus();return toast(W?'Escribe tu peso en kilos.':'Escribe la medida en centímetros.')}
     const d=isoDate(new Date());let e=S.body.find(x=>x.date===d);
     if(!e){e={id:uid(),date:d,weight:null};S.body.push(e)}
-    e[c.k]=Math.round(v*10)/10;save();renderKeep();toast('Medida guardada');
+    e[c.k]=W?Math.round(v*100)/100:Math.round(v*10)/10;save();renderKeep();toast(W?'Peso guardado':'Medida guardada');
   },
   body:()=>{
     const c=cur(),date=$('#b-date').value;
