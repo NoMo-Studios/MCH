@@ -229,6 +229,32 @@ svg.spark circle{fill:var(--blue)}
 .tip.on{opacity:1}
 .tip b{font:400 18px/1.15 var(--display);color:var(--ink)}
 
+/* Progreso */
+.hero-prog{margin-top:22px}
+.hero-prog .muted{font-size:15px}
+.fig-n.big{font-size:72px}
+.fig-n.pos{color:var(--blue)}
+.hero-prog .fig{margin-top:6px}
+.vol{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px;height:120px;align-items:end;margin-top:14px}
+.vb{height:100%;display:flex;align-items:flex-end}
+.vb span{display:block;width:100%;border-radius:4px 4px 0 0;background:var(--ink-3);opacity:.55}
+.vb.now span{background:var(--ink);opacity:1}
+.vol-x{display:flex;justify-content:space-between;font-size:13px;color:var(--ink-2);margin-top:6px;border-top:1px solid var(--line);padding-top:6px}
+.help b{color:var(--ink);font-weight:600}
+.acts .plate{width:28px;height:28px}
+.acts .plate svg{width:16px;height:16px}
+.plate.up{background:var(--blue);color:var(--on-blue)}
+.plate.flat{box-shadow:inset 0 0 0 1.5px var(--ink-3);color:var(--ink-2)}
+.gt{display:flex;align-items:center;gap:10px}
+.gtr{flex:1;height:10px;border-radius:5px;background:var(--field);overflow:hidden}
+.gf{display:block;height:100%;background:var(--ink);border-radius:0 5px 5px 0}
+.gf.ok{background:var(--blue)}
+.gt .bv{min-width:3.2em;text-align:right;white-space:nowrap}
+.gt .bv i{font-style:normal;color:var(--ink-2)}
+.dcol{min-width:4.6em;text-align:right}
+.delta{font:400 15px var(--display);color:var(--ink-2);white-space:nowrap}
+.delta.pos{color:var(--ink)}
+.delta.pos::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--blue);margin-right:6px;vertical-align:1px}
 /* Rutina y formularios */
 .day-block{margin-top:34px}
 .day-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
@@ -653,21 +679,95 @@ function vSession(c){
   return h;
 }
 
+function strengthChange(){
+  const now=Date.now(),a=now-28*DAY,b=now-56*DAY,out=[];
+  for(const id of Object.keys(S.ex)){
+    const hh=history(id);if(!hh.length||isBW(hh))continue;
+    const cur=hh.filter(x=>x.t>=a),prev=hh.filter(x=>x.t<a&&x.t>=b);
+    const before=prev.length?prev:hh.filter(x=>x.t<a).slice(-1);
+    if(!cur.length||!before.length)continue;
+    const c=Math.max(...cur.map(x=>x.best)),p=Math.max(...before.map(x=>x.best));
+    if(p>0)out.push({id,pct:(c-p)/p,diff:c-p});
+  }
+  return out;
+}
+function recordsSince(t){
+  const recs=[],best={},bw={};
+  for(const s of byTime())for(const en of s.entries){
+    if(!en.sets.length)continue;
+    const e=Math.max(...en.sets.map(x=>e1(x.w,x.r))),w=Math.max(...en.sets.map(x=>x.w));
+    const k=en.ex,had=k in best;
+    if(had&&s.start>=t&&(e>best[k]+0.05||w>bw[k]+1e-9))recs.push({ex:k,t:s.start,set:en.sets.reduce((a,c)=>e1(c.w,c.r)>e1(a.w,a.r)?c:a)});
+    best[k]=had?Math.max(best[k],e):e;bw[k]=had?Math.max(bw[k],w):w;
+  }
+  return recs;
+}
+function nextActions(){
+  const up=[],seen=new Set(),since=Date.now()-42*DAY;
+  for(const d of S.days)for(const it of d.items){
+    const ex=S.ex[it.ex];if(!ex||seen.has(ex.id))continue;
+    const last=lastEntry(ex.id,it),w=suggestion(it,ex,last);
+    if(w!=null){seen.add(ex.id);up.push({id:ex.id,day:d.name,w})}
+  }
+  const flat=[];
+  for(const id of Object.keys(S.ex)){
+    if(seen.has(id))continue;const h=history(id);
+    if(h.length&&h[h.length-1].t>=since&&stalled(id))flat.push({id,day:''});
+  }
+  return {up,flat};
+}
 function vProg(){
   let h=`<div class="top"></div><h1 class="title">Progreso</h1>`;
   if(!S.sessions.length)return h+`<p class="lead">Aquí verás cómo sube cada ejercicio. Termina tu primer entreno y empezará a llenarse.</p>`;
   const now=Date.now(),ws=weekStart(now);
-  let label='Esta semana',m=muscleSets(ws,addDays(ws,7));
-  if(!m.length){m=muscleSets(addDays(ws,-7),ws);label='La semana pasada'}
-  const max=Math.max(1,...m.map(x=>x[1]));
-  h+=`<section class="sec first"><div class="sec-head"><h2 class="h">Series por músculo</h2><span class="aux">${label}</span></div>${m.length?`<div class="bars">${m.map(([k,v])=>`<div class="bar"><span class="bl">${esc(k)}</span><span class="bt"><span class="bf" style="width:calc((100% - 2.6em) * ${(v/max).toFixed(3)})"></span><span class="bv">${v}</span></span></div>`).join('')}</div>`:`<p class="muted">Sin series en las dos últimas semanas.</p>`}</section>`;
+  /* 1. La cifra principal */
+  const ch=strengthChange(),month=S.sessions.filter(s=>s.start>=now-30*DAY).length,recs=recordsSince(now-30*DAY);
+  const avg=ch.length?ch.reduce((n,x)=>n+x.pct,0)/ch.length:null;
+  h+=`<section class="hero-prog">`;
+  if(avg!=null){
+    const pct=Math.round(avg*1000)/10,ups=ch.filter(x=>x.diff>0.05).length;
+    h+=`<p class="muted">Tu fuerza, últimas 4 semanas</p><p class="fig"><span class="fig-n big${pct>0?' pos':''}">${pct>0?'+':pct<0?'−':''}${NF1.format(Math.abs(pct))}</span><span class="fig-u">%</span></p><p class="muted">${ups} de ${plural(ch.length,'ejercicio ha','ejercicios han')} subido${ups===1&&ch.length!==1?'':''}.</p>`;
+  }else{
+    h+=`<p class="muted">Tu fuerza</p><p class="fig"><span class="fig-n big">${S.sessions.length}</span><span class="fig-u">${S.sessions.length===1?'entreno':'entrenos'}</span></p><p class="muted">Cuando lleves 4 semanas apuntando, aquí verás cuánto has subido.</p>`;
+  }
+  h+=`<div class="stats">${stat(String(month),'entrenos en 30 días')}${stat(String(recs.length),recs.length===1?'récord en 30 días':'récords en 30 días')}${stat(String(streakWeeks()),'semanas de racha')}</div></section>`;
+  /* 2. Volumen por semana */
+  const weeks=[];for(let i=7;i>=0;i--){const a=addDays(ws,-7*i),b=addDays(a,7);let v=0,n=0;for(const s of S.sessions)if(s.start>=a&&s.start<b)for(const en of s.entries)for(const st of en.sets){v+=st.w*st.r;n++}weeks.push({a,v,n})}
+  const vmax=Math.max(1,...weeks.map(w=>w.v)),cw=weeks[7],pw=weeks[6];
+  const fmtK=v=>v>=1000?NFC.format(v):kg(Math.round(v));
+  h+=`<section class="sec"><div class="sec-head"><h2 class="h">Volumen por semana</h2><span class="aux">kg movidos</span></div>
+  <div class="vol" role="img" aria-label="Volumen de las últimas 8 semanas">${weeks.map((w,i)=>`<div class="vb${i===7?' now':''}" title="${esc(F.short.format(w.a))}: ${esc(fmtK(w.v))} kg"><span style="height:${Math.max(2,w.v/vmax*100).toFixed(1)}%"></span></div>`).join('')}</div>
+  <div class="vol-x"><span>${esc(F.short.format(weeks[0].a))}</span><span>Esta semana</span></div>
+  <p class="help">Esta semana llevas <b>${esc(fmtK(cw.v))} kg</b> en ${plural(cw.n,'serie','series')}. La pasada, ${esc(fmtK(pw.v))} kg.</p></section>`;
+  /* 3. Qué hacer en el próximo entreno */
+  const na=nextActions();
+  if(na.up.length||na.flat.length){
+    h+=`<section class="sec"><h2 class="h">Para tu próximo entreno</h2><ul class="list acts">`;
+    h+=na.up.slice(0,4).map(x=>`<li><button class="row" data-act="open-ex" data-id="${esc(x.id)}"><span class="plate up">${icon('arrowUp')}</span><span class="main"><span class="t">${esc(exName(x.id))}</span><span class="s">Listo para subir. ${esc(x.day)}</span></span><span class="num">${kg(x.w)} kg</span></button></li>`).join('');
+    h+=na.flat.slice(0,3).map(x=>`<li><button class="row" data-act="open-ex" data-id="${esc(x.id)}"><span class="plate flat">${icon('flat')}</span><span class="main"><span class="t">${esc(exName(x.id))}</span><span class="s">3 sesiones sin mejorar</span></span>${icon('right','i chev')}</button></li>`).join('');
+    h+=`</ul>${na.flat.length?`<p class="help">Si un ejercicio se atasca, revisa técnica, descanso y sueño. Si se atascan varios a la vez, toca semana de descarga: mitad de series y más lejos del fallo.</p>`:''}</section>`;
+  }
+  /* 4. Series por músculo frente al plan */
+  const plan=new Map();for(const d of S.days)for(const it of d.items){const m=(S.ex[it.ex]&&S.ex[it.ex].muscle)||'Otro';plan.set(m,(plan.get(m)||0)+it.sets)}
+  const done=new Map(muscleSets(ws,addDays(ws,7)));
+  const ms=[...new Set([...plan.keys(),...done.keys()])].sort((a,b)=>(plan.get(b)||0)-(plan.get(a)||0)||(done.get(b)||0)-(done.get(a)||0));
+  if(ms.length){
+    h+=`<section class="sec"><div class="sec-head"><h2 class="h">Series por músculo</h2><span class="aux">Esta semana</span></div><div class="bars">${ms.map(k=>{
+      const v=done.get(k)||0,t=plan.get(k)||0,goal=t||v||1,ok=t>0&&v>=t;
+      return `<div class="bar"><span class="bl">${esc(k)}</span><span class="gt"><span class="gtr"><span class="gf${ok?' ok':''}" style="width:${Math.min(100,v/goal*100).toFixed(1)}%"></span></span><span class="bv">${v}${t?`<i>/${t}</i>`:''}</span></span></div>`}).join('')}</div>
+    <p class="help">El número de la derecha es tu plan semanal. La barra se pone azul cuando lo cumples.</p></section>`;
+  }
+  /* 5. Ejercicios */
   const lastUse=new Map();for(const s of S.sessions)for(const en of s.entries)if(en.sets.length&&(lastUse.get(en.ex)||0)<s.start)lastUse.set(en.ex,s.start);
   const ids=[...lastUse.keys()].filter(id=>S.ex[id]).sort((a,b)=>lastUse.get(b)-lastUse.get(a));
+  const chg=new Map(ch.map(x=>[x.id,x]));
   h+=`<section class="sec"><h2 class="h">Ejercicios</h2><ul class="list">${ids.map(id=>{
-    const hh=history(id),bw=isBW(hh);
+    const hh=history(id),bw=isBW(hh),c=chg.get(id);
     const val=bw?`${Math.max(...hh.map(x=>x.maxR))} reps`:`${kg(half(Math.max(...hh.map(x=>x.best))))} kg`;
-    return `<li><button class="row" data-act="open-ex" data-id="${esc(id)}"><span class="main"><span class="t">${esc(exName(id))}</span><span class="s">${bw?'Máximo de repeticiones':'Mejor 1RM estimado'}: ${val}</span></span>${spark(hh.slice(-12).map(x=>bw?x.maxR:x.best))}${icon('right','i chev')}</button></li>`;
-  }).join('')}</ul></section>`;
+    const d=c?Math.round(c.diff*2)/2:null;
+    const delta=d==null?'':d>0?`<span class="delta pos">+${kg(d)} kg</span>`:d<0?`<span class="delta">−${kg(-d)} kg</span>`:`<span class="delta">=</span>`;
+    return `<li><button class="row" data-act="open-ex" data-id="${esc(id)}"><span class="main"><span class="t">${esc(exName(id))}</span><span class="s">${bw?'Máximo':'1RM est.'}: ${val}</span></span>${spark(hh.slice(-12).map(x=>bw?x.maxR:x.best))}<span class="dcol">${delta}</span>${icon('right','i chev')}</button></li>`;
+  }).join('')}</ul><p class="help">La cifra de la derecha es lo que ha subido cada ejercicio en las últimas 4 semanas.</p></section>`;
   return h;
 }
 
@@ -754,7 +854,7 @@ function vSettings(){
     <input type="file" id="import-file" class="vh" tabindex="-1"></section>
   ${S.sample?`<section class="sec"><h2 class="h">Datos de ejemplo</h2><p class="help">Ahora ves una rutina y unos entrenos inventados para probar la app.</p><div class="form-acts"><button class="btn soft danger" data-act="clear-sample">Borrar datos de ejemplo</button></div></section>`:''}
   <div class="form-acts sec"><button class="btn soft danger" data-act="wipe">Borrar todos los datos</button></div>
-  <p class="small foot">MCH 1.1. Funciona sin conexión y no envía tus datos a ningún sitio. Tipografía: TeX Gyre Adventor, de GUST e-foundry.</p>`;
+  <p class="small foot">MCH 1.2. Funciona sin conexión y no envía tus datos a ningún sitio. Tipografía: TeX Gyre Adventor, de GUST e-foundry.</p>`;
 }
 
 function vRoutine(){
