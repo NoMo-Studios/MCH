@@ -22,15 +22,18 @@ A partir de ahí se abre como una app, a pantalla completa y también sin cobert
 
 TUS DATOS
 
-- Se guardan solo en tu iPhone. La app no envía nada a ningún sitio.
+- Se guardan solo en tu móvil. La app no envía nada a ningún sitio.
 - Haz una copia de vez en cuando: Hoy > Ajustes > Exportar copia, y guárdala en Archivos o iCloud Drive.
 - Antes de borrar el icono o de cambiar de móvil, exporta una copia. En el móvil nuevo: Ajustes > Importar copia.
 
 
 PARA PROBARLA ANTES DE EMPEZAR
 
-En la pantalla Hoy, "Probar con datos de ejemplo" carga una rutina y dos meses de entrenos inventados.
-Cuando termines de curiosear: "Borrar y empezar", y creas tu rutina.
+La primera vez que se abre, MCH da la bienvenida y pregunta sexo, altura y rutina.
+"Ver un ejemplo" carga una rutina y dos meses de entrenos inventados para curiosear.
+Cuando termines: Hoy > "Borrar y empezar", y eliges tu rutina.
+
+Para pasársela a un amigo, basta con mandarle el enlace: cada uno tiene sus propios datos en su móvil.
 
 
 SI ALGÚN DÍA CAMBIAS ALGO DE LA APP
