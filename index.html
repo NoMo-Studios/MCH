@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="format-detection" content="telephone=no">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="apple-touch-icon" href="icon-180.png?v=2">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="preload" href="mch-display-400.woff" as="font" type="font/woff" crossorigin>
 <link rel="preload" href="mch-display-700.woff" as="font" type="font/woff" crossorigin>
@@ -190,6 +190,9 @@ button.row:active{opacity:.5}
 .sil{position:relative;aspect-ratio:400/360;margin-top:8px}
 .sil svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 .sil .fg{fill:none;stroke:var(--ink-3);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.sil .fg.old{stroke:var(--ink-3);stroke-dasharray:3 4;opacity:.7}
+.sil .fg:not(.old){stroke:var(--ink-2)}
+.lg-old{display:inline-block;width:18px;border-top:1.5px dashed var(--ink-3);vertical-align:middle;margin-right:8px}
 .sil .ld{fill:none;stroke:var(--line);stroke-width:1.2}
 .sil .hs{fill:var(--bg);stroke:var(--ink-2);stroke-width:1.5}
 .sil .hs.on{fill:var(--ink);stroke:var(--ink)}
@@ -891,16 +894,36 @@ function vExercise(c){
 }
 
 const lastOf=k=>{let a=null;for(const e of S.body)if(e[k]!=null&&(!a||e.date>a.date))a=e;return a};
-const SIL={neck:[200,58,'r',36],shoulders:[250,80,'r',100],chest:[226,112,'r',164],waist:[222,172,'r',228],arm:[137,132,'l',120],hip:[170,206,'l',200],thigh:[178,258,'l',280]};
+const BODY_DEF={neck:38,shoulders:115,chest:100,arm:34,waist:82,hip:96,thigh:56};
+const BODY_K={neck:.32,shoulders:.40,chest:.33,arm:.30,waist:.35,hip:.35,thigh:.32};
+const BODY_LIM={neck:[8,17],shoulders:[30,64],chest:[24,52],arm:[7,13],waist:[17,48],hip:[22,50],thigh:[11,20]};
+function bodyGeo(m){
+  const g={};for(const k in BODY_DEF){const c=m[k]!=null?BODY_DEF[k]+(m[k]-BODY_DEF[k])*1.6:BODY_DEF[k];const [lo,hi]=BODY_LIM[k];g[k]=Math.max(lo,Math.min(hi,c*BODY_K[k]*1.77/2))}
+  return g;
+}
+function crPath(P){let d=`M${P[0][0].toFixed(1)} ${P[0][1].toFixed(1)}`;for(let i=0;i<P.length-1;i++){const p0=P[i-1]||P[i],p1=P[i],p2=P[i+1],p3=P[i+2]||p2;d+=`C${(p1[0]+(p2[0]-p0[0])/6).toFixed(1)} ${(p1[1]+(p2[1]-p0[1])/6).toFixed(1)} ${(p2[0]-(p3[0]-p1[0])/6).toFixed(1)} ${(p2[1]-(p3[1]-p1[1])/6).toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`}return d}
+function bodyPaths(m){
+  const g=bodyGeo(m),c=200,n=g.neck,sh=Math.max(g.shoulders,g.chest+4),ch=g.chest,w=g.waist,hp=Math.max(g.hip,w),a=g.arm,t=g.thigh;
+  const L=[[c-n,60],[c-(n+sh)/2-4,70],[c-sh+6,78],[c-sh,92],[c-ch,120],[c-(ch+w)/2,146],[c-w,172],[c-hp,206]];
+  const R=L.map(([x,y])=>[2*c-x,y]).reverse();
+  const torso=crPath(L)+crPath(R)+`M${c-n} 52v8M${c+n} 52v8`;
+  const arm=side=>{const s=side,ax=c+s*Math.max(sh-a,ch+a+3);return crPath([[c+s*sh,92],[ax+s*a,128],[ax+s*a*0.85,160],[ax+s*a*0.6,190]])+crPath([[c+s*(ch+1),122],[ax-s*a,140],[ax-s*a*0.8,165],[ax-s*a*0.5,190]])};
+  const leg=side=>{const s=side,cx=c+s*(2+t),out=[[c+s*hp,206],[cx+s*t,250],[cx+s*t*0.8,296],[cx+s*t*0.45,340]],inn=[[c+s*2,218],[cx-s*t*0.95,256],[cx-s*t*0.7,298],[cx-s*t*0.4,340]];return crPath(out)+crPath(inn)};
+  const pts={neck:[c,58],shoulders:[c+sh,90],chest:[c+ch*0.55,120],waist:[c+w,172],arm:[c-Math.max(sh-a,ch+a+3),140],hip:[c-hp,206],thigh:[c-2-t,256]};
+  return {d:`<circle cx="${c}" cy="32" r="20"/>`+`<path d="${torso}${arm(-1)}${arm(1)}${leg(-1)}${leg(1)}M${c-2} 218Q${c} 212 ${c+2} 218"/>`,pts};
+}
+const SIL_LY={neck:['r',36],shoulders:['r',100],chest:['r',164],waist:['r',228],arm:['l',120],hip:['l',200],thigh:['l',280]};
 function silhouette(){
-  const fig='<path d="M190 52v8M210 52v8"/><circle cx="200" cy="32" r="20"/><path d="M190 60C176 64 158 66 150 78C146 86 150 100 156 112C162 135 170 155 172 170C172 185 168 195 168 206L232 206C232 195 228 185 228 170C230 155 238 135 244 112C250 100 254 86 250 78C242 66 224 64 210 60"/><path d="M150 78C140 86 136 104 134 124C132 146 130 166 128 188M156 112C152 132 146 152 144 188M250 78C260 86 264 104 266 124C268 146 270 166 272 188M244 112C248 132 254 152 256 188"/><path d="M168 206C166 252 170 292 174 340M198 216C196 262 194 302 192 340M232 206C234 252 230 292 226 340M202 216C204 262 206 302 208 340M198 216Q200 211 202 216"/>';
+  const cur={},first={};let any=false,diff=false;
+  for(const [k] of MEASURES){const e=lastOf(k);if(e){cur[k]=e[k];any=true}let f=null;for(const x of S.body)if(x[k]!=null&&(!f||x.date<f.date))f=x;if(f){first[k]=f[k];if(e&&f[k]!==e[k])diff=true}}
+  const now=bodyPaths(cur),old=diff?bodyPaths(first):null;
   let lines='',labels='';
   for(const [k,l] of MEASURES){
-    const [x,y,side,ly]=SIL[k],e=lastOf(k),right=side==='r',lx=right?304:96;
-    lines+=`<path class="ld" d="M${x} ${y}L${right?Math.max(x+14,268):Math.min(x-14,124)} ${ly}L${lx} ${ly}"/><circle class="hs${e?' on':''}" cx="${x}" cy="${y}" r="4.5"/>`;
+    const [x,y]=now.pts[k],[side,ly]=SIL_LY[k],e=lastOf(k),right=side==='r',lx=right?304:96;
+    lines+=`<path class="ld" d="M${x.toFixed(1)} ${y}L${right?Math.max(x+14,272):Math.min(x-14,128)} ${ly}L${lx} ${ly}"/><circle class="hs${e?' on':''}" cx="${x.toFixed(1)}" cy="${y}" r="4.5"/>`;
     labels+=`<button class="sl ${right?'r':'l'}" style="top:${(ly/360*100).toFixed(2)}%" data-act="measure" data-k="${k}"><span>${l}</span><b>${e?NF1.format(e[k])+' cm':'Añadir'}</b></button>`;
   }
-  return `<div class="sil"><svg viewBox="0 0 400 360" aria-hidden="true"><g class="fg">${fig}</g>${lines}</svg>${labels}</div>`;
+  return `<div class="sil"><svg viewBox="0 0 400 360" aria-hidden="true">${old?`<g class="fg old">${old.d}</g>`:''}<g class="fg">${now.d}</g>${lines}</svg>${labels}</div>${old?`<p class="help"><span class="lg-old"></span>Tu cuerpo con tus primeras medidas. La figura se dibuja con las medidas que apuntas.</p>`:any?`<p class="help">La figura se dibuja con tus medidas. Cuando apuntes otras nuevas, verás tu forma de antes en discontinuo.</p>`:''}`;
 }
 function vIndexV(){
   const sh=lastOf('shoulders'),wa=lastOf('waist');
@@ -1014,7 +1037,7 @@ function vSettings(){
     <input type="file" id="import-file" class="vh" tabindex="-1"></section>
   ${S.sample?`<section class="sec"><h2 class="h">Datos de ejemplo</h2><p class="help">Ahora ves una rutina y unos entrenos inventados para probar la app.</p><div class="form-acts"><button class="btn soft danger" data-act="clear-sample">Borrar datos de ejemplo</button></div></section>`:''}
   <div class="form-acts sec"><button class="btn soft danger" data-act="wipe">Borrar todos los datos</button></div>
-  <p class="small foot">MCH 1.5. Funciona sin conexión y no envía tus datos a ningún sitio. Tipografía: TeX Gyre Adventor, de GUST e-foundry.</p>`;
+  <p class="small foot">MCH 1.6. Funciona sin conexión y no envía tus datos a ningún sitio. Tipografía: TeX Gyre Adventor, de GUST e-foundry.</p>`;
 }
 
 function vRoutine(){
