@@ -187,6 +187,17 @@ button.row:active{opacity:.5}
 .cd.skip.today>span{border-color:var(--ink)}
 .year{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 20px;margin-top:10px}
 @media(min-width:520px){.year{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.how{margin-top:32px;padding:18px;border-radius:18px;background:var(--field)}
+.how-row{display:grid;grid-template-columns:92px minmax(0,1fr);gap:16px;align-items:start}
+.how-fig{width:92px;height:auto;display:block}
+.how-fig .fg{fill:none;stroke:var(--ink-3);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.how-fig .zone{stroke:var(--blue);stroke-width:5;stroke-linecap:round}
+.how-steps{margin:8px 0 0;padding-left:1.2em;font-size:15px;display:grid;gap:6px}
+.how-steps li::marker{font-family:var(--display);color:var(--ink-2)}
+.how-err{margin-top:14px;font-size:15px}
+.how-err b{font-weight:600}
+.how .help{margin-top:10px}
+.mtip{font-size:13px;color:var(--ink-2);margin-top:6px}
 .sil{position:relative;aspect-ratio:400/360;margin-top:8px}
 .sil svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 .sil .fg{fill:none;stroke:var(--ink-3);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
@@ -423,7 +434,27 @@ const INCS=[0.5,1,1.25,2,2.5,5];
 const TABS=['hoy','historial','progreso','cuerpo'];
 const FULL=['workout','day','item','exedit','bodyedit','pick','measure','compare'];
 const MEASURES=[['neck','Cuello'],['shoulders','Hombros'],['chest','Pecho'],['arm','Brazo'],['waist','Cintura'],['hip','Cadera'],['thigh','Muslo']];
-const MTIPS={neck:'Por debajo de la nuez, con la cinta recta.',shoulders:'Por la parte más ancha de los hombros, con los brazos relajados.',chest:'A la altura de los pezones, después de soltar el aire.',arm:'Brazo flexionado y apretado, por la parte más gruesa del bíceps.',waist:'A la altura del ombligo, en ayunas y sin meter tripa.',hip:'Por la parte más ancha del glúteo.',thigh:'Por la parte más gruesa del muslo, de pie y relajado.'};
+const MTIPS={neck:'Justo debajo de la nuez.',shoulders:'Por lo más ancho de los hombros, brazos relajados.',chest:'A la altura de los pezones, sin hinchar el pecho.',arm:'Bíceps flexionado, por lo más grueso.',waist:'A la altura del ombligo, en ayunas.',hip:'Por lo más saliente del glúteo.',thigh:'Justo debajo del glúteo, pierna relajada.'};
+const MHOW={
+ neck:{steps:['Mira al frente con los hombros relajados.','Pasa la cinta justo por debajo de la nuez, un poco inclinada hacia abajo por delante.','Ajústala sin apretar y no tragues mientras lees el número.'],err:'Subir la cinta hacia la barbilla: el cuello sale más fino de lo que es.'},
+ shoulders:{steps:['De pie, brazos sueltos a los lados, sin sacar pecho.','Pasa la cinta por la parte más ancha: por encima de los deltoides, lo que más sobresale visto de frente.','Hazlo frente al espejo o que te ayuden, para ver que va recta por delante y por detrás.'],err:'Encoger los hombros o separar los brazos: cambia varios centímetros.'},
+ chest:{steps:['Brazos relajados a los lados.','Pasa la cinta a la altura de los pezones y, por la espalda, por debajo de las axilas.','Lee el número al final de una respiración normal, sin hinchar el pecho.'],err:'Medir con los pulmones llenos o con la cinta caída por la espalda.'},
+ arm:{steps:['Usa siempre el mismo brazo, por ejemplo el derecho.','Flexiónalo a 90° y aprieta el bíceps.','Mide por la parte más gruesa, con la cinta perpendicular al brazo.'],err:'Medir un día flexionado y otro relajado, o cambiar de brazo.'},
+ waist:{steps:['Por la mañana, en ayunas y después de ir al baño.','De pie, pasa la cinta a la altura del ombligo, paralela al suelo.','Suelta el aire con normalidad y mide sin meter tripa.'],err:'Medir un día por el ombligo y otro por la parte más estrecha: no son comparables.'},
+ hip:{steps:['De pie, con los pies juntos.','Mírate de lado y busca la parte más saliente del glúteo.','Pasa la cinta por ahí, paralela al suelo.'],err:'Que la cinta suba por detrás o baje por delante.'},
+ thigh:{steps:['Usa siempre la misma pierna, por ejemplo la derecha.','De pie, con el peso repartido en las dos piernas y el muslo relajado.','Mide justo por debajo del glúteo, en la parte más gruesa.'],err:'Apretar el cuádriceps o medir cada vez a una altura distinta.'}};
+function howFig(k){
+  const m={};for(const [x] of MEASURES){const e=lastOf(x);if(e)m[x]=e[x]}
+  const b=bodyPaths(m),g=bodyGeo(Object.fromEntries(Object.entries(m))),c=200,sh=Math.max(g.shoulders,g.chest+4),hp=Math.max(g.hip,g.waist),ax=c-Math.max(sh-g.arm,g.chest+g.arm+3),tc=c-2-g.thigh;
+  const Z={neck:[c-g.neck-4,57,c+g.neck+4,57],shoulders:[c-sh-4,90,c+sh+4,90],chest:[c-g.chest-6,120,c+g.chest+6,120],waist:[c-g.waist-5,172,c+g.waist+5,172],hip:[c-hp-5,204,c+hp+5,204],arm:[ax-g.arm-5,140,ax+g.arm+5,140],thigh:[tc-g.thigh-5,252,tc+g.thigh+5,252]}[k];
+  return `<svg class="how-fig" viewBox="110 0 180 350" aria-hidden="true"><g class="fg">${b.d}</g><line class="zone" x1="${Z[0].toFixed(1)}" y1="${Z[1]}" x2="${Z[2].toFixed(1)}" y2="${Z[3]}"/></svg>`;
+}
+function howTo(k){
+  const h=MHOW[k];if(!h)return '';
+  return `<section class="how"><div class="how-row">${howFig(k)}<div><h2 class="h">Cómo medirlo</h2><ol class="how-steps">${h.steps.map(x=>`<li>${esc(x)}</li>`).join('')}</ol></div></div>
+  <p class="how-err"><b>Error típico:</b> ${esc(h.err)}</p>
+  <p class="help">Siempre: cinta flexible, ajustada sin hundir la piel y paralela al suelo. Mide a la misma hora y en las mismas condiciones. Mide dos veces: si te sale distinto, repite y apunta la media.</p></section>`;
+}
 
 /* ───────── Utilidades ───────── */
 const app=document.getElementById('app');
@@ -963,9 +994,10 @@ function vMeasure(c){
   const k=c.k,l=(MEASURES.find(m=>m[0]===k)||[k,k])[1];
   const v=S.body.filter(e=>e[k]!=null).sort((a,b)=>a.date<b.date?-1:1),a=v[v.length-1],b=v[v.length-2],f=v[0];
   let h=`<div class="top">${backBtn('Cuerpo')}</div><h1 class="title">${esc(l)}</h1><p class="sub">${esc(MTIPS[k]||'')}</p>`;
+  const guide=howTo(k);
   if(a)h+=`<div class="kpi"><p class="fig"><span class="fig-n">${NF1.format(a[k])}</span><span class="fig-u">cm</span></p><p class="muted">${b?`${sign(a[k]-b[k])}${NF1.format(Math.abs(Math.round((a[k]-b[k])*10)/10))} cm desde la anterior. `:''}${v.length>1?`${sign(a[k]-f[k])}${NF1.format(Math.abs(Math.round((a[k]-f[k])*10)/10))} cm desde el ${esc(F.short.format(dateNum(f.date)))}.`:`Medido el ${esc(F.short.format(dateNum(a.date)))}.`}</p></div>`;
   if(v.length>1)h+=chartBox('c-m',v.map(e=>({x:dateNum(e.date),y:e[k],d:''})),'cm',`Evolución de ${l}`);
-  h+=`<form class="form" data-form="measure" novalidate><label class="field"><span>Medida de hoy</span><span class="unit-in"><input id="m-val" inputmode="decimal" autocomplete="off" placeholder="${a?esc(NF1.format(a[k])):''}"><i>cm</i></span></label><div class="form-acts"><button class="btn primary" type="submit">Guardar</button></div></form>`;
+  h+=`<form class="form" data-form="measure" novalidate><label class="field"><span>Medida de hoy</span><span class="unit-in"><input id="m-val" inputmode="decimal" autocomplete="off" placeholder="${a?esc(NF1.format(a[k])):''}"><i>cm</i></span></label><div class="form-acts"><button class="btn primary" type="submit">Guardar</button></div></form>`+guide;
   if(v.length)h+=`<section class="sec"><h2 class="h">Historial</h2><ul class="list">${v.slice().reverse().map(e=>`<li><button class="row" data-act="body-edit" data-id="${esc(e.id)}"><span class="main"><span class="t">${esc(cap(F.wd.format(dateNum(e.date))))}</span></span><span class="num">${NF1.format(e[k])} cm</span>${icon('right','i chev')}</button></li>`).join('')}</ul></section>`;
   return h;
 }
@@ -1017,7 +1049,7 @@ function vBodyEdit(c){
     <label class="field"><span>Fecha</span><input id="b-date" type="date" value="${esc(e?e.date:today)}" max="${today}" required></label>
     ${f('b-weight','Peso',e&&e.weight,'kg','78,5')}
     <p class="help">Las medidas son opcionales, en centímetros.</p>
-    <div class="pair">${MEASURES.map(([k,l])=>f('b-'+k,l,e&&e[k],'cm','')).join('')}</div>
+    <div class="pair">${MEASURES.map(([k,l])=>`<div>${f('b-'+k,l,e&&e[k],'cm','')}<p class="mtip">${esc(MTIPS[k])}</p></div>`).join('')}</div>
     <div class="form-acts"><button class="btn primary" type="submit">Guardar</button>${e?`<button class="btn soft danger" type="button" data-act="body-del" data-id="${esc(e.id)}">Borrar registro</button>`:''}</div>
   </form>`;
 }
@@ -1037,7 +1069,7 @@ function vSettings(){
     <input type="file" id="import-file" class="vh" tabindex="-1"></section>
   ${S.sample?`<section class="sec"><h2 class="h">Datos de ejemplo</h2><p class="help">Ahora ves una rutina y unos entrenos inventados para probar la app.</p><div class="form-acts"><button class="btn soft danger" data-act="clear-sample">Borrar datos de ejemplo</button></div></section>`:''}
   <div class="form-acts sec"><button class="btn soft danger" data-act="wipe">Borrar todos los datos</button></div>
-  <p class="small foot">MCH 1.6. Funciona sin conexión y no envía tus datos a ningún sitio. Tipografía: TeX Gyre Adventor, de GUST e-foundry.</p>`;
+  <p class="small foot">MCH 1.7. Funciona sin conexión y no envía tus datos a ningún sitio. Tipografía: TeX Gyre Adventor, de GUST e-foundry.</p>`;
 }
 
 function vRoutine(){
