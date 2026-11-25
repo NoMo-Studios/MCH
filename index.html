@@ -968,7 +968,7 @@ function vYear(){
   }
   return `<div class="cal-head"><h2 class="h">${y}</h2><div class="cal-nav"><button class="ibtn" data-act="yr" data-d="-1" aria-label="Año anterior">${icon('left')}</button><button class="ibtn" data-act="yr" data-d="1" aria-label="Año siguiente"${y>=cy?' disabled':''}>${icon('right')}</button></div></div>
   <div class="year">${months}</div>
-  <div class="stats two">${stat(String(total),total===1?'día entrenado este año':'días entrenados este año')}${stat(String(streakWeeks()),'semanas seguidas con tu objetivo cumplido')}</div>
+  <div class="stats two">${stat(String(total),(total===1?'día entrenado':'días entrenados')+(y===cy?' este año':` en ${y}`))}${stat(String(streakWeeks()),'semanas seguidas con tu objetivo cumplido')}</div>
   <p class="help">Cada punto es un día entrenado. Toca un mes para verlo en grande.</p>`;
 }
 function vHist(){
@@ -1111,7 +1111,10 @@ function vProg(){
   /* 4. Constancia */
   const nW=pk==='1m'?5:pk==='3m'?13:52,trained=new Set(S.sessions.map(x=>dayStart(x.start))),today=dayStart(now);
   let cells='',cnt=0;for(let w=nW-1;w>=0;w--){const a=addDays(ws,-7*w);for(let d=0;d<7;d++){const t=addDays(a,d),on=trained.has(t);if(on)cnt++;cells+=`<i class="${on?'on':t>today?'fu':''}"></i>`}}
-  h+=`<section class="sec"><div class="sec-head"><h2 class="h">Constancia</h2><span class="aux">${plural(cnt,'entreno','entrenos')}</span></div><div class="cons${nW>20?' tight':''}" style="grid-template-columns:repeat(${nW},minmax(0,${nW>20?8:16}px))" role="img" aria-label="${plural(cnt,'día entrenado','días entrenados')} en ${nW} semanas">${cells}</div><div class="stats two">${stat(String(streakWeeks()),'semanas de racha')}${stat(NF1.format(Math.round(cnt/nW*10)/10),'entrenos por semana')}</div></section>`;
+  /* la media cuenta desde tu primer entreno, no desde el principio del periodo */
+  let firstT=Infinity;for(const x of S.sessions)if(x.start<firstT)firstT=x.start;
+  const spanD=Math.max(7,Math.round((today-Math.max(addDays(ws,-7*(nW-1)),dayStart(firstT)))/DAY)+1),perW=Math.round(cnt/spanD*70)/10;
+  h+=`<section class="sec"><div class="sec-head"><h2 class="h">Constancia</h2><span class="aux">${plural(cnt,'día','días')}</span></div><div class="cons${nW>20?' tight':''}" style="grid-template-columns:repeat(${nW},minmax(0,${nW>20?8:16}px))" role="img" aria-label="${plural(cnt,'día entrenado','días entrenados')} en ${nW} semanas">${cells}</div><div class="stats two">${stat(String(streakWeeks()),'semanas de racha')}${stat(NF1.format(perW),perW===1?'día por semana':'días por semana')}</div></section>`;
   /* 5. Próximo entreno */
   const na=nextActions();
   if(na.up.length||na.flat.length){
@@ -1132,7 +1135,7 @@ function vProg(){
   for(const s of all){for(const en of s.entries)for(const x of en.sets){tv+=x.w*x.r;ts++}wdc[(new Date(s.start).getDay()+6)%7]++;if(!s.late)hrs.push(new Date(s.start).getHours()+new Date(s.start).getMinutes()/60)}
   const WD=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'],fav=wdc.indexOf(Math.max(...wdc));
   hrs.sort((a,b)=>a-b);const med=hrs.length?hrs[Math.floor(hrs.length/2)]:null;
-  const hh2=med!=null?`${String(Math.floor(med)).padStart(2,'0')}:${String(Math.round((med%1)*60/15)*15%60).padStart(2,'0')}`:'—';
+  const q=med!=null?Math.round(med*4)/4:null,hh2=q!=null?`${String(Math.floor(q)%24).padStart(2,'0')}:${String(Math.round((q%1)*60)).padStart(2,'0')}`:'—';
   h+=`<section class="sec"><h2 class="h">Tus datos</h2><div class="tiles">
   <div class="tile"><span class="tl-v">${fmtTh(tv)}</span><span class="tl-l">Levantado en total</span></div>
   <div class="tile"><span class="tl-v">${NFC.format(ts)}</span><span class="tl-l">Series hechas</span></div>
@@ -1143,9 +1146,11 @@ function vProg(){
   const ids=[...lastUse.keys()].filter(id=>S.ex[id]).sort((a,b)=>lastUse.get(b)-lastUse.get(a));
   h+=`<section class="sec"><h2 class="h">Ejercicios</h2><ul class="list">${ids.map(id=>{
     const hh=history(id),bw=isBW(hh),inP=hh.filter(x=>x.t>=from);
-    const val=bw?`${Math.max(...hh.map(x=>x.maxR))} reps`:`${kg(half(Math.max(...hh.map(x=>x.best))))} kg`;
+    const top=hh.reduce((a,x)=>x.maxW>a.maxW||(x.maxW===a.maxW&&x.maxWr>a.maxWr)?x:a);
+    const val=bw?`Máx. ${Math.max(...hh.map(x=>x.maxR))} reps`:`Máx. ${kg(top.maxW)} kg × ${top.maxWr}`;
     let delta='';
-    if(!bw&&inP.length>1){const d=half(inP[inP.length-1].best-inP[0].best);delta=d>0?`<span class="delta pos">+${kg(d)}</span>`:d<0?`<span class="delta">−${kg(-d)}</span>`:`<span class="delta">=</span>`}
+    if(inP.length>1){const a=bw?inP[0].maxR:inP[0].best,b=bw?inP[inP.length-1].maxR:inP[inP.length-1].best,d=bw?b-a:(a>0?Math.round((b-a)/a*100):0),u=bw?'':' %';
+      delta=d>0?`<span class="delta pos">+${d}${u}</span>`:d<0?`<span class="delta">−${-d}${u}</span>`:`<span class="delta">=</span>`}
     return `<li><button class="row" data-act="open-ex" data-id="${esc(id)}"><span class="main"><span class="t">${esc(exName(id))}</span><span class="s">${val}</span></span>${spark((inP.length>1?inP:hh).slice(-16).map(x=>bw?x.maxR:x.best))}<span class="dcol">${delta}</span>${icon('right','i chev')}</button></li>`;
   }).join('')}</ul></section>`;
   return h;
@@ -1158,7 +1163,7 @@ function vExercise(c){
   let h=`<div class="top">${backBtn()}<span class="sp"></span><button class="link" data-act="edit-ex" data-id="${esc(c.id)}">Editar</button></div>
   <h1 class="title">${esc(ex.name)}</h1><p class="sub">${esc(ex.muscle)}, ${plural(hh.length,'sesión','sesiones')}</p>`;
   if(!hh.length)return h+`<p class="lead">Aún no has hecho este ejercicio. Cuando lo apuntes en un entreno, aquí verás su evolución.</p>`;
-  const metrics=bw?[['reps','Reps máx.'],['tot','Reps totales']]:[['e1','1RM est.'],['peso','Peso máx.'],['vol','Volumen']];
+  const metrics=bw?[['reps','Reps máx.'],['tot','Reps totales']]:[['peso','Peso máx.'],['e1','1RM est.'],['vol','Volumen']];
   const m=metrics.some(x=>x[0]===c.m)?c.m:metrics[0][0];
   const val=x=>m==='e1'?half(x.best):m==='peso'?x.maxW:m==='vol'?Math.round(x.vol):m==='reps'?x.maxR:x.tot;
   const unit=m==='reps'||m==='tot'?'reps':'kg';
@@ -1718,12 +1723,14 @@ function f3Lines(stage){
 /* ───────── Recuperación muscular ─────────
    Cada serie cansa su músculo principal y, en parte, los secundarios. El cansancio baja con el
    tiempo: unos 3 días en músculos grandes y unos 2 en pequeños. Es una estimación, no una medida. */
-const REC_REG={'Pecho':1,'Espalda':2,'Hombro':3,'Deltoide lateral':3,'Bíceps':4,'Tríceps':5,'Antebrazo':6,'Abdomen':7,'Trapecio':8,'Glúteo':9,'Cuádriceps':10,'Femoral':11,'Gemelo':12,'Cuello':13};
+const REC_REG={'Pecho':1,'Espalda':2,'Hombro':3,'Deltoide lateral':3,'Deltoide anterior':3,'Deltoide posterior':3,'Bíceps':4,'Tríceps':5,'Antebrazo':6,'Abdomen':7,'Trapecio':8,'Glúteo':9,'Cuádriceps':10,'Femoral':11,'Gemelo':12,'Cuello':13};
 const REC_NAME=['','Pecho','Espalda','Hombros','Bíceps','Tríceps','Antebrazos','Abdomen','Trapecio','Glúteos','Cuádriceps','Femorales','Gemelos','Cuello'];
 const REC_BIG=new Set([1,2,9,10,11]);
 const REC_SEC={1:[[5,.4],[3,.35]],2:[[4,.4],[8,.25],[6,.2]],3:[[5,.3],[8,.2]],4:[[6,.3]],9:[[11,.3],[10,.2]],10:[[9,.45],[11,.15]],11:[[9,.35],[2,.15]]};
+const REC_KW=[[/delt|hombro/,3],[/trapec/,8],[/pect|pecho/,1],[/dorsal|espalda|lumbar|romboide|redondo/,2],[/bicep/,4],[/tricep/,5],[/antebrazo|muneca|agarre/,6],[/abdom|oblicuo|core/,7],[/glute|abductor/,9],[/cuadri|aductor/,10],[/femoral|isquio/,11],[/gemelo|soleo|pantorr/,12],[/cuello/,13]];
+function recReg(m){if(!m)return 0;if(REC_REG[m])return REC_REG[m];const n=norm(m);for(const [re,r] of REC_KW)if(re.test(n))return r;return 0}
 function recMuscles(ex){
-  const r=REC_REG[ex.muscle];if(!r)return [];
+  const r=recReg(ex.muscle);if(!r)return [];
   const n=norm(ex.name||'');
   if(/peso muerto/.test(n)&&!/rumano/.test(n))return [[2,1],[11,.6],[9,.6],[8,.3],[6,.3]];
   if(r===10&&/sentadilla|prensa|zancada|bulgara|hack/.test(n))return [[10,1],[9,.55],[11,.2]];
@@ -1761,7 +1768,7 @@ function recHeat(M,L){
   return h;
 }
 /* músculos del día que toca: los principales de sus ejercicios */
-function dayRegions(day){const set=new Set();for(const it of day.items){const ex=S.ex[it.ex];const r=ex&&REC_REG[ex.muscle];if(r)set.add(r)}return [...set]}
+function dayRegions(day){const set=new Set();for(const it of day.items){const ex=S.ex[it.ex];const r=ex&&recReg(ex.muscle);if(r)set.add(r)}return [...set]}
 function recLine(day,st){
   const rs=dayRegions(day).filter(r=>st.L[r]>0.15).sort((a,b)=>st.L[b]-st.L[a]).slice(0,2);
   if(!rs.length)return 'Músculos recuperados';
@@ -2718,19 +2725,23 @@ function loadSample(){
   const now=Date.now(),today=dayStart(now),w0=addDays(weekStart(now),-63),slots=[0,1,3,5];
   let k=0;
   for(let wk=0;wk<=9;wk++)for(const sl of slots){
-    const t=addDays(w0,wk*7+sl);if(t>=today)continue;if(rnd()<0.07)continue;
+    /* constancia creíble: un solo día sin ir, al principio */
+    const t=addDays(w0,wk*7+sl);if(t>=today)continue;if(wk===1&&sl===3)continue;
     const day=s.days[k%s.days.length];k++;
     const d=new Date(t);d.setHours(18,5+Math.floor(rnd()*45),0,0);const start=d.getTime();
     const entries=[];
     for(const it of day.items){
       const p=st[it.id],ex=s.ex[it.ex],cap2=p.w>0?it.max:it.max+4,sets=[];
-      for(let j=0;j<it.sets;j++){let r=p.r-(j>=2&&rnd()<0.45?1:0)-(j===it.sets-1&&rnd()<0.2?1:0);r=Math.max(it.min-1,Math.min(cap2,r));sets.push({w:p.w,r})}
-      entries.push({ex:it.ex,item:it.id,sets});
+      /* el press militar se atasca a mitad: mismas series cada semana, para ver un "Estancado" */
       const stuck=ex.name==='Press militar'&&wk>=5;
-      if(!stuck){
+      if(stuck){if(!p.stuck)p.stuck=Array.from({length:it.sets},(_,j)=>({w:p.w,r:j<2?it.min+1:it.min}));for(const x of p.stuck)sets.push({...x})}
+      else{
+        const nail=p.w>0&&p.r>=it.max&&rnd()<0.85;
+        for(let j=0;j<it.sets;j++){let r=nail?p.r:p.r-(j>=2&&rnd()<0.45?1:0)-(j===it.sets-1&&rnd()<0.2?1:0);r=Math.max(it.min-1,Math.min(cap2,r));sets.push({w:p.w,r})}
         if(p.w>0&&sets.every(x=>x.r>=it.max)){p.w=r4(p.w+ex.inc);p.r=it.min}
         else if(rnd()<0.72)p.r=Math.min(cap2,p.r+1);
       }
+      entries.push({ex:it.ex,item:it.id,sets});
     }
     s.sessions.push({id:uid(),day:day.id,dayName:day.name,dayLabel:day.label,start,end:start+(46+Math.floor(rnd()*26))*6e4,entries});
   }
