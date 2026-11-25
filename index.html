@@ -183,6 +183,28 @@ button.row:active{opacity:.5}
 .cd.today>span{box-shadow:inset 0 0 0 1.5px var(--ink)}
 .cd.today.on>span{box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px var(--ink)}
 .cd.future{color:var(--ink-3)}
+.cd.skip>span,.lg.skip{box-shadow:none;border:1.5px dashed var(--ink-2)}
+.cd.skip.today>span{border-color:var(--ink)}
+.year{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 20px;margin-top:10px}
+@media(min-width:520px){.year{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.ym{display:flex;flex-direction:column;align-self:start;text-align:left;padding:4px 0;border-radius:10px;transition:opacity 160ms ease}
+.ym:active{opacity:.55}
+.ym-h{display:flex;justify-content:space-between;align-items:baseline;font-size:14px;font-weight:600;margin-bottom:6px}
+.ym-h b{font:400 14px var(--display);color:var(--ink-2)}
+.ym-g{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.ym-g i{aspect-ratio:1;border-radius:50%;background:var(--field);display:block}
+.ym-g i.e{background:none}
+.ym-g i.on{background:var(--ink)}
+.ym-g i.sk{background:none;border:1px dashed var(--ink-2)}
+.ym-g i.fu{background:none;box-shadow:inset 0 0 0 1px var(--line)}
+.ym-g i.td{outline:1.5px solid var(--ink);outline-offset:1px}
+.wd.skip i{box-shadow:none;border:1.5px dashed var(--ink-2)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;margin-top:10px;font-size:13px;color:var(--ink-2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.lg{width:12px;height:12px;border-radius:50%;display:inline-block}
+.lg.on{background:var(--ink)}
+.pick-day li{padding:0;display:block}
+.pick-day .row{min-height:56px}
 button.cd:active>span{transform:scale(.92)}
 .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:22px}
 .stats.two{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -419,7 +441,7 @@ const I={
 const icon=(n,cls='i')=>`<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${I[n]}</svg>`;
 
 /* ───────── Estado (se guarda en este iPhone) ───────── */
-const fresh=()=>({v:1,ex:{},days:[],sessions:[],body:[],draft:null,goal:4,backup:null,sample:false});
+const fresh=()=>({v:1,ex:{},days:[],sessions:[],body:[],draft:null,goal:4,backup:null,sample:false,skips:[]});
 let S=load();
 function load(){
   try{const raw=localStorage.getItem(KEY);if(raw){const d=JSON.parse(raw);if(d&&d.v===1)return Object.assign(fresh(),d)}}catch(e){}
@@ -510,8 +532,13 @@ function makeEntry(exId,item){
   }
   return {ex:exId,item:item?item.id:null,min:item?item.min:null,max:item?item.max:null,target,sug,stall:stalled(exId),last:last?last.sets.map(s=>({w:s.w,r:s.r})):null,sets};
 }
+const isoT=t=>isoDate(new Date(t));
+const skipOn=t=>(S.skips||[]).find(k=>k.date===isoT(t));
+const sdur=s=>s.late?'—':dur(s.end-s.start);
 function nextDay(){
-  const last=S.sessions.slice().sort((a,b)=>b.start-a.start)[0];
+  let last=null;
+  for(const x of S.sessions)if(!last||x.start>last.start)last=x;
+  for(const k of S.skips||[])if(k.advance&&(!last||k.t>last.start))last={start:k.t,day:k.day};
   if(!last)return S.days[0];
   const i=S.days.findIndex(d=>d.id===last.day);
   return S.days[(i+1)%S.days.length]||S.days[0];
@@ -535,7 +562,7 @@ function muscleSets(from,to){
 
 /* ───────── Navegación ───────── */
 let nav=[{v:'hoy'}];
-let calMonth=null;
+let calMonth=null,histMode='mes',calYear=new Date().getFullYear();
 const LABELS={hoy:'Hoy',historial:'Historial',progreso:'Progreso',cuerpo:'Cuerpo',workout:'Entreno',settings:'Ajustes',routine:'Rutina',exercises:'Ejercicios',session:'Entreno',exercise:'Ejercicio',pick:'Añadir'};
 function backLabel(){
   const p=nav[nav.length-2];if(!p)return 'Hoy';
@@ -583,15 +610,19 @@ function vHoy(){
     h+=`<section class="hero empty"><h2 class="hero-label">Tu rutina está lista para cargar</h2><p class="muted">${esc(MY_ROUTINE.title)}: 5 días de gimnasio y el cuello en casa después de los días 1, 3 y 5. Luego puedes cambiar lo que quieras en Ajustes, Rutina.</p>
     <div class="hero-acts"><button class="btn primary" data-act="mine">Cargar mi rutina</button><button class="btn text" data-act="routine">Crear otra desde cero</button><button class="btn text" data-act="sample">Probar con datos de ejemplo</button></div></section>`;
   }else{
-    const nx=nextDay(),lt=lastDone(nx.id);
+    const nx=nextDay(),lt=lastDone(nx.id),sk=skipOn(now),trainedToday=S.sessions.some(x=>dayStart(x.start)===dayStart(now));
+    if(sk&&!trainedToday){
+      h+=`<section class="hero"><p class="muted">Hoy</p><p class="hero-day">Descanso</p><p class="muted">Has saltado ${esc(sk.dayName)}. ${sk.advance?`El próximo día toca ${esc(nx.name)}.`:`El próximo día te volverá a tocar ${esc(sk.dayName)}.`}</p>
+      <div class="hero-acts"><button class="btn soft" data-act="train-anyway">Entrenar igualmente</button><button class="btn text" data-act="unskip">Deshacer</button></div></section>`;
+    }else
     h+=`<section class="hero"><p class="muted">Te toca</p><p class="hero-day">${esc(nx.name)}</p>${nx.label?`<p class="hero-label">${esc(nx.label)}</p>`:''}<p class="muted">${plural(nx.items.length,'ejercicio','ejercicios')}${lt?`. La última vez, ${ago(lt)}`:''}.</p>
-    <div class="hero-acts"><button class="btn primary" data-act="start" data-id="${esc(nx.id)}">Empezar</button></div></section>`;
+    <div class="hero-acts"><button class="btn primary" data-act="start" data-id="${esc(nx.id)}">Empezar</button>${trainedToday?'':`<button class="btn text" data-act="skip" data-id="${esc(nx.id)}">Saltar hoy</button>`}</div></section>`;
   }
   if(S.days.length||S.sessions.length){
     const ws=weekStart(now),done=trainedDays(ws,addDays(ws,7)),today=dayStart(now);
     const L=['L','M','X','J','V','S','D'],full=['lunes','martes','miércoles','jueves','viernes','sábado','domingo'];
     let cells='';
-    for(let i=0;i<7;i++){const t=addDays(ws,i);cells+=`<div class="wd${done.has(t)?' on':''}${t===today?' today':''}"><i></i><span aria-hidden="true">${L[i]}</span><span class="vh">${full[i]}${done.has(t)?', entrenado':''}</span></div>`}
+    for(let i=0;i<7;i++){const t=addDays(ws,i),sk2=!done.has(t)&&skipOn(t);cells+=`<div class="wd${done.has(t)?' on':''}${sk2?' skip':''}${t===today?' today':''}"><i></i><span aria-hidden="true">${L[i]}</span><span class="vh">${full[i]}${done.has(t)?', entrenado':sk2?', saltado':''}</span></div>`}
     const n=done.size;
     h+=`<section class="sec"><div class="sec-head"><h2 class="h">Esta semana</h2><span class="aux">${n} de ${S.goal} ${S.goal===1?'día':'días'}${n>=S.goal?', hecho':''}</span></div><div class="week">${cells}</div></section>`;
   }
@@ -608,7 +639,7 @@ function vWorkout(){
   const d=S.draft;
   if(!d){nav=[{v:'hoy'}];return vHoy()}
   let h=`<div class="top">${backBtn('Hoy')}</div>
-  <h1 class="title">${esc(d.dayLabel||d.dayName)}</h1><p class="sub">${d.dayLabel?esc(d.dayName)+', empezado':'Empezado'} a las ${esc(F.time.format(d.start))}</p>`;
+  <h1 class="title">${esc(d.dayLabel||d.dayName)}</h1><p class="sub">${d.past?`${d.dayLabel?esc(d.dayName)+'. ':''}Entreno del ${esc(F.long.format(d.start))}`:`${d.dayLabel?esc(d.dayName)+', empezado':'Empezado'} a las ${esc(F.time.format(d.start))}`}</p>`;
   h+=d.entries.map((en,i)=>exBlock(en,i)).join('');
   if(!d.entries.length)h+=`<p class="lead">Este día no tiene ejercicios. Añade uno para empezar.</p>`;
   h+=`<div class="w-end"><button class="btn soft" data-act="add-ex">${icon('plus')}Añadir ejercicio</button><button class="btn primary" data-act="finish">Terminar entreno</button></div>`;
@@ -641,7 +672,25 @@ function setRow(st,i,j){
   ${st.rec?`<p class="rec-line${st.anim?' new':''}"><i></i>${esc(recText(st))}</p>`:''}</div>`;
 }
 
+function vYear(){
+  const now=Date.now(),today=dayStart(now),y=calYear,cy=new Date(now).getFullYear();
+  const trained=new Set(S.sessions.map(x=>dayStart(x.start))),skipped=new Set((S.skips||[]).map(k=>dateNum(k.date)));
+  let total=0,months='';
+  for(let m=0;m<12;m++){
+    const first=new Date(y,m,1),off=(first.getDay()+6)%7,n=new Date(y,m+1,0).getDate();let cnt=0,cells='';
+    for(let i=0;i<off;i++)cells+='<i class="e"></i>';
+    for(let d=1;d<=n;d++){const t=new Date(y,m,d).getTime(),on=trained.has(t);if(on)cnt++;cells+=`<i class="${on?'on':skipped.has(t)?'sk':t>today?'fu':''}${t===today?' td':''}"></i>`}
+    total+=cnt;
+    months+=`<button class="ym" data-act="ym" data-m="${m}" aria-label="${esc(cap(F.month.format(first)))}: ${cnt} días entrenados"><span class="ym-h"><span>${esc(cap(F.monthOnly.format(first)))}</span><b>${cnt||''}</b></span><span class="ym-g">${cells}</span></button>`;
+  }
+  return `<div class="cal-head"><h2 class="h">${y}</h2><div class="cal-nav"><button class="ibtn" data-act="yr" data-d="-1" aria-label="Año anterior">${icon('left')}</button><button class="ibtn" data-act="yr" data-d="1" aria-label="Año siguiente"${y>=cy?' disabled':''}>${icon('right')}</button></div></div>
+  <div class="year">${months}</div>
+  <div class="stats two">${stat(String(total),total===1?'día entrenado este año':'días entrenados este año')}${stat(String(streakWeeks()),'semanas seguidas con tu objetivo cumplido')}</div>
+  <p class="help">Cada punto es un día entrenado. Toca un mes para verlo en grande.</p>`;
+}
 function vHist(){
+  const seg=`<div class="seg" role="group" aria-label="Vista"><button data-act="hmode" data-m="mes" aria-pressed="${histMode==='mes'}">Mes</button><button data-act="hmode" data-m="año" aria-pressed="${histMode==='año'}">Año</button></div>`;
+  if(histMode==='año')return `<div class="top"></div><h1 class="title">Historial</h1>${seg}${vYear()}`;
   const now=Date.now(),nd=new Date(now);
   if(!calMonth)calMonth={y:nd.getFullYear(),m:nd.getMonth()};
   const first=new Date(calMonth.y,calMonth.m,1),next=new Date(calMonth.y,calMonth.m+1,1);
@@ -651,17 +700,22 @@ function vHist(){
   let cells=['L','M','X','J','V','S','D'].map(x=>`<span class="ch" aria-hidden="true">${x}</span>`).join('');
   for(let i=0;i<off;i++)cells+='<span></span>';
   for(let dd=1;dd<=n;dd++){
-    const t=new Date(calMonth.y,calMonth.m,dd).getTime(),s=byDay.get(t);
-    const cls=`cd${s?' on':''}${t===today?' today':''}${t>today?' future':''}`;
-    cells+=s?`<button class="${cls}" data-act="open-session" data-id="${esc(s.id)}" aria-label="${esc(cap(F.long.format(t)))}: ${esc(sessionTitle(s))}"><span>${dd}</span></button>`:`<span class="${cls}"><span>${dd}</span></span>`;
+    const t=new Date(calMonth.y,calMonth.m,dd).getTime(),s=byDay.get(t),sk=!s&&skipOn(t);
+    const cls=`cd${s?' on':''}${sk?' skip':''}${t===today?' today':''}${t>today?' future':''}`;
+    const lab=esc(cap(F.long.format(t)))+(s?': '+esc(sessionTitle(s)):sk?': saltado':'');
+    cells+=t>today?`<span class="${cls}"><span>${dd}</span></span>`:`<button class="${cls}" data-act="cal-day" data-t="${t}" aria-label="${lab}"><span>${dd}</span></button>`;
   }
   const isCur=calMonth.y===nd.getFullYear()&&calMonth.m===nd.getMonth();
   const streak=streakWeeks();
-  let h=`<div class="top"></div><h1 class="title">Historial</h1>
+  let h=`<div class="top"></div><h1 class="title">Historial</h1>${seg}
   <div class="cal-head"><h2 class="h">${esc(cap(F.month.format(first)))}</h2><div class="cal-nav"><button class="ibtn" data-act="cal" data-d="-1" aria-label="Mes anterior">${icon('left')}</button><button class="ibtn" data-act="cal" data-d="1" aria-label="Mes siguiente"${isCur?' disabled':''}>${icon('right')}</button></div></div>
   <div class="cal">${cells}</div>
+  <div class="legend"><span><i class="lg on"></i>Entrenado</span><span><i class="lg skip"></i>Saltado</span><span class="muted">Toca un día para apuntarlo</span></div>
   <div class="stats two">${stat(String(inMonth.length),`${inMonth.length===1?'entreno':'entrenos'} ${isCur?'este mes':'en '+F.monthOnly.format(first)}`)}${stat(String(streak),streak===1?'semana seguida con tu objetivo cumplido':'semanas seguidas con tu objetivo cumplido')}</div>`;
-  h+=`<section class="sec"><h2 class="h">Entrenos</h2>${inMonth.length?`<ul class="list">${inMonth.map(s=>`<li><button class="row" data-act="open-session" data-id="${esc(s.id)}"><span class="main"><span class="t">${esc(sessionTitle(s))}</span><span class="s">${esc(cap(F.wd.format(s.start)))}</span></span><span class="num">${esc(dur(s.end-s.start))}</span>${icon('right','i chev')}</button></li>`).join('')}</ul>`:`<p class="lead">${S.sessions.length?'Este mes no hay entrenos.':'Aún no hay entrenos. Cuando termines el primero, aparecerá aquí con su fecha y sus series.'}</p>`}</section>`;
+  const skM=(S.skips||[]).map(k=>({k,t:dateNum(k.date)})).filter(x=>x.t>=first.getTime()&&x.t<next.getTime()&&!byDay.has(x.t));
+  const rows=[...inMonth.map(s=>({t:s.start,html:`<li><button class="row" data-act="open-session" data-id="${esc(s.id)}"><span class="main"><span class="t">${esc(sessionTitle(s))}</span><span class="s">${esc(cap(F.wd.format(s.start)))}</span></span><span class="num">${esc(sdur(s))}</span>${icon('right','i chev')}</button></li>`})),
+    ...skM.map(x=>({t:x.t,html:`<li><button class="row" data-act="cal-day" data-t="${x.t}"><span class="main"><span class="t muted">Saltado: ${esc(x.k.dayName)}</span><span class="s">${esc(cap(F.wd.format(x.t)))}</span></span>${icon('right','i chev')}</button></li>`}))].sort((a,b)=>b.t-a.t);
+  h+=`<section class="sec"><h2 class="h">Entrenos</h2>${rows.length?`<ul class="list">${rows.map(r=>r.html).join('')}</ul>`:`<p class="lead">${S.sessions.length?'Este mes no hay entrenos.':'Aún no hay entrenos. Cuando termines el primero, aparecerá aquí con su fecha y sus series.'}</p>`}</section>`;
   return h;
 }
 
@@ -672,7 +726,7 @@ function vSession(c){
   const sets=s.entries.reduce((n,en)=>n+en.sets.length,0),vol=s.entries.reduce((n,en)=>n+en.sets.reduce((m,st)=>m+st.w*st.r,0),0);
   let h=`<div class="top">${backBtn()}</div>
   <h1 class="title">${esc(s.dayLabel||s.dayName)}</h1><p class="sub">${s.dayLabel?esc(s.dayName)+'. ':''}${esc(cap(F.long.format(s.start)))}, a las ${esc(F.time.format(s.start))}</p>`;
-  if(!c.edit)h+=`<div class="stats">${stat(dur(s.end-s.start),'Duración')}${stat(String(sets),'Series')}${stat(kg(Math.round(vol))+' kg','Volumen')}</div>`;
+  if(!c.edit)h+=`<div class="stats">${stat(sdur(s),'Duración')}${stat(String(sets),'Series')}${stat(kg(Math.round(vol))+' kg','Volumen')}</div>`;
   h+=`<div class="sec first">${src.entries.map((en,i)=>`<section class="sx"><h2 class="ex-name">${esc(exName(en.ex))}</h2>${c.edit?en.sets.map((st,j)=>`<div class="eset" data-i="${i}" data-j="${j}"><span class="n">${j+1}</span><input class="w" inputmode="decimal" autocomplete="off" aria-label="Peso de la serie ${j+1}" value="${esc(kg(st.w))}"><span class="x" aria-hidden="true">×</span><input class="r" inputmode="numeric" autocomplete="off" aria-label="Repeticiones de la serie ${j+1}" value="${esc(st.r)}"><button class="ibtn" data-act="tmp-del-set" data-i="${i}" data-j="${j}" aria-label="Quitar la serie ${j+1}">${icon('minus')}</button></div>`).join(''):`<div class="toks">${en.sets.map(st=>`<span class="tk">${esc(tok(st))}</span>`).join('')}</div>`}</section>`).join('')}</div>`;
   h+=c.edit?`<div class="form-acts"><button class="btn primary" data-act="session-save">Guardar cambios</button><button class="btn soft" data-act="session-cancel">Cancelar</button></div>`
     :`<div class="form-acts"><button class="btn soft" data-act="session-edit">Editar entreno</button><button class="btn text danger" data-act="session-del">Borrar entreno</button></div>`;
@@ -854,7 +908,7 @@ function vSettings(){
     <input type="file" id="import-file" class="vh" tabindex="-1"></section>
   ${S.sample?`<section class="sec"><h2 class="h">Datos de ejemplo</h2><p class="help">Ahora ves una rutina y unos entrenos inventados para probar la app.</p><div class="form-acts"><button class="btn soft danger" data-act="clear-sample">Borrar datos de ejemplo</button></div></section>`:''}
   <div class="form-acts sec"><button class="btn soft danger" data-act="wipe">Borrar todos los datos</button></div>
-  <p class="small foot">MCH 1.2. Funciona sin conexión y no envía tus datos a ningún sitio. Tipografía: TeX Gyre Adventor, de GUST e-foundry.</p>`;
+  <p class="small foot">MCH 1.4. Funciona sin conexión y no envía tus datos a ningún sitio. Tipografía: TeX Gyre Adventor, de GUST e-foundry.</p>`;
 }
 
 function vRoutine(){
@@ -1077,9 +1131,11 @@ const hx=document.createElement('label');hx.className='vh';hx.setAttribute('aria
 function haptic(){try{if(navigator.vibrate)navigator.vibrate(8);else hx.click()}catch(e){}}
 
 /* ───────── Acciones ───────── */
-function startDay(id){
+function startDay(id,t){
   const day=S.days.find(d=>d.id===id);if(!day)return;
-  S.draft={id:uid(),day:day.id,dayName:day.name,dayLabel:day.label||'',start:Date.now(),lastAt:null,y:0,entries:day.items.filter(it=>S.ex[it.ex]).map(it=>makeEntry(it.ex,it))};
+  const now=Date.now(),past=t!=null&&dayStart(+t)<dayStart(now),start=past?dayStart(+t)+19*3600e3:now;
+  S.skips=(S.skips||[]).filter(k=>k.date!==isoT(start));
+  S.draft={id:uid(),day:day.id,dayName:day.name,dayLabel:day.label||'',start,created:now,past,lastAt:null,y:0,entries:day.items.filter(it=>S.ex[it.ex]).map(it=>makeEntry(it.ex,it))};
   save();closeSheet();nav=[{v:'hoy'},{v:'workout'}];render();scrollTo(0,0);
 }
 function discardNow(){S.draft=null;save();nav=[{v:'hoy'}];render();scrollTo(0,0);toast('Entreno descartado')}
@@ -1107,14 +1163,14 @@ function finish(force){
     if(sets.length)entries.push({ex:en.ex,item:en.item,sets});
     for(const s of en.sets)if(s.done&&s.rec)recs.push({ex:en.ex,w:+s.w,r:+s.r,rec:s.rec});
   }
-  const end=Math.max(d.start+6e4,d.lastAt||Date.now());
-  const s={id:d.id,day:d.day,dayName:d.dayName,dayLabel:d.dayLabel,start:d.start,end,entries};
+  const end=d.past?d.start:Math.max(d.start+6e4,d.lastAt||Date.now());
+  const s={id:d.id,day:d.day,dayName:d.dayName,dayLabel:d.dayLabel,start:d.start,end,entries};if(d.past)s.late=true;
   S.sessions.push(s);S.draft=null;save();
   nav=[{v:'hoy'}];render();scrollTo(0,0);
   const nSets=entries.reduce((n,en)=>n+en.sets.length,0),vol=entries.reduce((n,en)=>n+en.sets.reduce((m,st)=>m+st.w*st.r,0),0);
   sheetActs=[];
   openSheet(`<h2 class="sh-t">Entreno guardado</h2><p class="sh-p">${esc(sessionTitle(s))}</p>
-  <div class="stats">${stat(dur(s.end-s.start),'Duración')}${stat(String(nSets),'Series')}${stat(kg(Math.round(vol))+' kg','Volumen')}</div>
+  <div class="stats">${stat(sdur(s),'Duración')}${stat(String(nSets),'Series')}${stat(kg(Math.round(vol))+' kg','Volumen')}</div>
   ${recs.length?`<h3 class="sh-h">${recs.length===1?'Un récord':`${recs.length} récords`}</h3><ul class="plain">${recs.map(r=>`<li><i class="dot"></i><span class="grow">${esc(exName(r.ex))}</span><span class="num">${esc(tok(r))}</span></li>`).join('')}</ul>`:''}
   <div class="sh-acts"><button class="btn primary" data-act="sheet-close">Hecho</button></div>`);
 }
@@ -1174,9 +1230,39 @@ const ACT={
     const dr=S.draft;
     if(dr&&dr.entries.some(en=>en.sets.some(s=>s.done))){
       const day=S.days.find(x=>x.id===d.id);
-      return actionSheet('Tienes un entreno a medias',`Si empiezas ${day?day.name:'otro día'}, se descarta el entreno de ${dr.dayName}.`,[{label:`Empezar ${day?day.name:''}`.trim(),kind:'primary',run:()=>startDay(d.id)},{label:`Volver a ${dr.dayName}`,kind:'soft',run:()=>{nav=[{v:'hoy'},{v:'workout'}];render();scrollTo(0,dr.y||0)}}]);
+      return actionSheet('Tienes un entreno a medias',`Si empiezas ${day?day.name:'otro día'}, se descarta el entreno de ${dr.dayName}.`,[{label:`Empezar ${day?day.name:''}`.trim(),kind:'primary',run:()=>startDay(d.id,d.t)},{label:`Volver a ${dr.dayName}`,kind:'soft',run:()=>{nav=[{v:'hoy'},{v:'workout'}];render();scrollTo(0,dr.y||0)}}]);
     }
-    startDay(d.id);
+    startDay(d.id,d.t);
+  },
+  skip:d=>{
+    const day=S.days.find(x=>x.id===d.id);if(!day)return;
+    const i=S.days.indexOf(day),nx=S.days[(i+1)%S.days.length];
+    const add=advance=>{S.skips=(S.skips||[]).filter(k=>k.date!==isoT(Date.now()));S.skips.push({date:isoT(Date.now()),t:Date.now(),day:day.id,dayName:day.name,advance});save();renderKeep();toast('Día saltado')};
+    actionSheet(`¿Saltar ${day.name} hoy?`,'Quedará marcado en tu historial como día saltado.',[
+      {label:`Hacerlo el próximo día`,kind:'primary',run:()=>add(false)},
+      ...(S.days.length>1?[{label:`Saltarlo y pasar a ${nx.name}`,kind:'soft',run:()=>add(true)}]:[]),
+      {label:'Cancelar',kind:'text'}]);
+  },
+  unskip:()=>{S.skips=(S.skips||[]).filter(k=>k.date!==isoT(Date.now()));save();renderKeep()},
+  'train-anyway':()=>{const k=skipOn(Date.now());S.skips=(S.skips||[]).filter(x=>x!==k);save();const day=k&&S.days.find(x=>x.id===k.day);if(day)ACT.start({id:day.id});else renderKeep()},
+  hmode:d=>{histMode=d.m;renderKeep()},
+  yr:d=>{calYear+= +d.d;renderKeep()},
+  ym:d=>{calMonth={y:calYear,m:+d.m};histMode='mes';render();scrollTo(0,0)},
+  'cal-day':d=>{
+    const t=+d.t,s=S.sessions.filter(x=>dayStart(x.start)===t),sk=skipOn(t);
+    if(s.length===1)return go({v:'session',id:s[0].id});
+    const acts=[];
+    for(const x of s)acts.push({label:`Ver ${sessionTitle(x)}`,kind:'soft',run:()=>go({v:'session',id:x.id})});
+    if(S.days.length)acts.push({label:s.length?'Apuntar otro entreno este día':'Apuntar entreno de este día',kind:s.length?'soft':'primary',run:()=>{
+      sheetActs=[];
+      openSheet(`<h2 class="sh-t">¿Qué entrenaste?</h2><p class="sh-p">${esc(cap(F.long.format(t)))}</p><ul class="plain pick-day">${S.days.map(dd=>`<li><button class="row" data-act="start" data-id="${esc(dd.id)}" data-t="${t}"><span class="main"><span class="t">${esc(dd.name)}</span>${dd.label?`<span class="s">${esc(dd.label)}</span>`:''}</span>${icon('right','i chev')}</button></li>`).join('')}</ul><div class="sh-acts"><button class="btn text" data-act="sheet-close">Cancelar</button></div>`);
+    }});
+    if(!s.length){
+      if(sk)acts.push({label:'Quitar el salto',kind:'soft',run:()=>{S.skips=S.skips.filter(k=>k!==sk);save();renderKeep()}});
+      else if(S.days.length)acts.push({label:'Marcar como saltado',kind:'soft',run:()=>{const nx=nextDay();S.skips=(S.skips||[]).concat({date:isoT(t),t:t+12*3600e3,day:nx.id,dayName:nx.name,advance:false});save();renderKeep()}});
+    }
+    acts.push({label:'Cancelar',kind:'text'});
+    actionSheet(cap(F.long.format(t)),s.length?'':sk?`Lo marcaste como saltado (${sk.dayName}).`:'Este día no tiene nada apuntado.',acts);
   },
   resume:()=>{go({v:'workout'});scrollTo(0,(S.draft&&S.draft.y)||0)},
   discard:()=>confirmDel('¿Descartar el entreno?','Se pierden las series que hayas marcado hoy.','Descartar entreno',discardNow),
@@ -1487,7 +1573,7 @@ function loadSample(){
 }
 
 /* ───────── Arranque ───────── */
-if(S.draft&&Date.now()-(S.draft.lastAt||S.draft.start)<4*3600e3)nav=[{v:'hoy'},{v:'workout'}];
+if(S.draft&&Date.now()-(S.draft.lastAt||S.draft.created||S.draft.start)<4*3600e3)nav=[{v:'hoy'},{v:'workout'}];
 render();
 if(cur().v==='workout')scrollTo(0,S.draft.y||0);
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1')){
