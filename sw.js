@@ -1,6 +1,6 @@
 /* MCH: guarda la app en el iPhone para que abra al instante y sin conexión.
    Al cambiar cualquier archivo, sube la versión para que se actualice. */
-const VERSION = 'mch-1.0.9';
+const VERSION = 'mch-1.1.1';
 const FILES = [
   './',
   './index.html',

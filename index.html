@@ -201,6 +201,11 @@ button.row:active{opacity:.5}
 .sil{position:relative;aspect-ratio:400/360;margin-top:8px}
 .sil svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 .sil .fg{fill:none;stroke:var(--ink-3);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.fg .fill{fill:var(--bg)}
+.fg .fo{stroke:none}
+.fg .mus{fill:none;stroke:var(--ink-3);stroke-width:1.2}
+.how-fig .fg .fill{fill:var(--field)}
+.how-fig .fg .mus{stroke-width:1.6}
 .sil .fg.old{stroke:var(--ink-3);stroke-dasharray:3 4;opacity:.7}
 .sil .fg:not(.old){stroke:var(--ink-2)}
 .lg-old{display:inline-block;width:18px;border-top:1.5px dashed var(--ink-3);vertical-align:middle;margin-right:8px}
@@ -446,7 +451,7 @@ const MHOW={
 function howFig(k){
   const m={};for(const [x] of MEASURES){const e=lastOf(x);if(e)m[x]=e[x]}
   const b=bodyPaths(m),g=bodyGeo(Object.fromEntries(Object.entries(m))),c=200,sh=Math.max(g.shoulders,g.chest+4),hp=Math.max(g.hip,g.waist),ax=c-Math.max(sh-g.arm,g.chest+g.arm+3),tc=c-2-g.thigh;
-  const Z={neck:[c-g.neck-4,57,c+g.neck+4,57],shoulders:[c-sh-4,90,c+sh+4,90],chest:[c-g.chest-6,120,c+g.chest+6,120],waist:[c-g.waist-5,172,c+g.waist+5,172],hip:[c-hp-5,204,c+hp+5,204],arm:[ax-g.arm-5,140,ax+g.arm+5,140],thigh:[tc-g.thigh-5,252,tc+g.thigh+5,252]}[k];
+  const ax2=c-sh+g.arm,lc2=c-3-g.thigh*0.95;const Z={neck:[c-g.neck-4,55,c+g.neck+4,55],shoulders:[c-sh-5,80,c+sh+5,80],chest:[c-g.chest-6,96,c+g.chest+6,96],waist:[c-g.waist-5,138,c+g.waist+5,138],hip:[c-hp-5,166,c+hp+5,166],arm:[ax2-g.arm-5,116,ax2+g.arm+5,116],thigh:[lc2-g.thigh-5,212,lc2+g.thigh+5,212]}[k];
   return `<svg class="how-fig" viewBox="110 0 180 350" aria-hidden="true"><g class="fg">${b.d}</g><line class="zone" x1="${Z[0].toFixed(1)}" y1="${Z[1]}" x2="${Z[2].toFixed(1)}" y2="${Z[3]}"/></svg>`;
 }
 function howTo(k){
@@ -933,28 +938,59 @@ function bodyGeo(m){
   return g;
 }
 function crPath(P){let d=`M${P[0][0].toFixed(1)} ${P[0][1].toFixed(1)}`;for(let i=0;i<P.length-1;i++){const p0=P[i-1]||P[i],p1=P[i],p2=P[i+1],p3=P[i+2]||p2;d+=`C${(p1[0]+(p2[0]-p0[0])/6).toFixed(1)} ${(p1[1]+(p2[1]-p0[1])/6).toFixed(1)} ${(p2[0]-(p3[0]-p1[0])/6).toFixed(1)} ${(p2[1]-(p3[1]-p1[1])/6).toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`}return d}
-function bodyPaths(m){
-  const g=bodyGeo(m),c=200,n=g.neck,sh=Math.max(g.shoulders,g.chest+4),ch=g.chest,w=g.waist,hp=Math.max(g.hip,w),a=g.arm,t=g.thigh;
-  const L=[[c-n,60],[c-(n+sh)/2-4,70],[c-sh+6,78],[c-sh,92],[c-ch,120],[c-(ch+w)/2,146],[c-w,172],[c-hp,206]];
-  const R=L.map(([x,y])=>[2*c-x,y]).reverse();
-  const torso=crPath(L)+crPath(R)+`M${c-n} 52v8M${c+n} 52v8`;
-  const arm=side=>{const s=side,ax=c+s*Math.max(sh-a,ch+a+3);return crPath([[c+s*sh,92],[ax+s*a,128],[ax+s*a*0.85,160],[ax+s*a*0.6,190]])+crPath([[c+s*(ch+1),122],[ax-s*a,140],[ax-s*a*0.8,165],[ax-s*a*0.5,190]])};
-  const leg=side=>{const s=side,cx=c+s*(2+t),out=[[c+s*hp,206],[cx+s*t,250],[cx+s*t*0.8,296],[cx+s*t*0.45,340]],inn=[[c+s*2,218],[cx-s*t*0.95,256],[cx-s*t*0.7,298],[cx-s*t*0.4,340]];return crPath(out)+crPath(inn)};
-  const pts={neck:[c,58],shoulders:[c+sh,90],chest:[c+ch*0.55,120],waist:[c+w,172],arm:[c-Math.max(sh-a,ch+a+3),140],hip:[c-hp,206],thigh:[c-2-t,256]};
-  return {d:`<circle cx="${c}" cy="32" r="20"/>`+`<path d="${torso}${arm(-1)}${arm(1)}${leg(-1)}${leg(1)}M${c-2} 218Q${c} 212 ${c+2} 218"/>`,pts};
+function crClosed(P){const n=P.length;let d=`M${P[0][0].toFixed(1)} ${P[0][1].toFixed(1)}`;for(let i=0;i<n;i++){const p0=P[(i-1+n)%n],p1=P[i],p2=P[(i+1)%n],p3=P[(i+2)%n];d+=`C${(p1[0]+(p2[0]-p0[0])/6).toFixed(1)} ${(p1[1]+(p2[1]-p0[1])/6).toFixed(1)} ${(p2[0]-(p3[0]-p1[0])/6).toFixed(1)} ${(p2[1]-(p3[1]-p1[1])/6).toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`}return d+'Z'}
+function bodyPaths(m,ghost){
+  const g=bodyGeo(m),c=200,n=g.neck,sh=Math.max(g.shoulders,g.chest+5),ch=g.chest,w=Math.min(g.waist,ch+3),hp=Math.max(g.hip,w+2),a=g.arm,t=g.thigh;
+  const mir=P=>P.map(([x,y])=>[2*c-x,y]);
+  const has=k=>m[k]!=null,cl=v=>Math.max(0,Math.min(1,v));
+  const mus=cl(((has('arm')?(m.arm-31)/10:0.4)+(has('chest')&&has('waist')?(m.chest/m.waist-1.08)/0.32:0.4)+(has('shoulders')&&has('waist')?(m.shoulders/m.waist-1.3)/0.35:0.4))/3);
+  const lean=has('waist')?cl((92-m.waist)/18):0.35;
+  /* canon de 8 cabezas: cabeza 9-51, pezones ~98, ombligo ~136, entrepierna ~186, rodilla ~264, pies ~348 */
+  const TL=[[c-n,46],[c-n*1.05,57],[c-(n+sh)/2,62],[c-sh+14,65],[c-sh+9,72],[c-ch,90],[c-ch-1,104],[c-(ch+w)/2,121],[c-w,138],[c-(w+hp)/2-1,154],[c-hp,168],[c-hp+3,180]];
+  const torso=crClosed([...TL,[c,187],...mir(TL).reverse()]);
+  const ax=c-sh+a*1.0;
+  const AL=[[c-sh+16,63],[c-sh+3,69],[c-sh-1,80],[c-sh+2,96],[ax-a,110],[ax-a*0.82+1,131],[ax-a*0.96+2,144],[ax-a*0.55+3,176],[ax-a*0.66+3,191],[ax-a*0.05+3,202],[ax+a*0.6+3,191],[ax+a*0.5+3,176],[ax+a*0.74+2,148],[ax+a*0.6+1,132],[ax+a*0.9,112],[c-ch+3,91],[c-sh+20,74]];
+  const lc=c-3-t*0.95;
+  const LL=[[c-hp+3,176],[lc-t,198],[lc-t*0.9,224],[lc-t*0.64,252],[lc-t*0.58,264],[lc-t*0.74,284],[lc-t*0.6,306],[lc-t*0.36,334],[lc-t*0.44,346],[lc+t*0.44,348],[lc+t*0.3,334],[lc+t*0.5,290],[lc+t*0.4,264],[lc+t*0.66,224],[c-1,190]];
+  const head=crClosed([[c,9],[c+13,13],[c+16,26],[c+15,36],[c+11,45],[c+5,51],[c-5,51],[c-11,45],[c-15,36],[c-16,26],[c-13,13]]);
+  const fo=dd=>ghost?'':`<path class="fill fo" d="${dd}"/>`;
+  const legOpen=P=>{const o=P.slice(0,10),i=P.slice(9);return crPath(o)+crPath(i)};
+  const fill=ghost?'':' class="fill"';
+  let d=fo(crClosed(LL))+fo(crClosed(mir(LL)))+`<path d="${legOpen(LL)}${legOpen(mir(LL))}"/>`+fo(torso)+`<path d="${crPath(TL)}${crPath(mir(TL))}"/><path${fill} d="${crClosed(AL)}"/><path${fill} d="${crClosed(mir(AL))}"/><path${fill} d="${head}"/>`;
+  if(!ghost){
+    const op=v=>`style="opacity:${(0.18+0.72*v).toFixed(2)}"`,M=[],A=[];
+    for(const s of [-1,1]){
+      const X=x=>c+s*x,axs=c+s*(c-ax),lcs=c+s*(c-lc);
+      M.push(`M${X(4)} 63Q${X(sh*0.5)} 64 ${X(sh-15)} 67`);
+      M.push(`M${X(2)} 101Q${X(ch*0.6)} 106 ${X(ch-3)} 89`);
+      M.push(`M${X(sh-17)} 70Q${X(sh-9)} 82 ${X(sh-4)} 97`);
+      M.push(`M${axs+s*a*0.25} 102Q${axs-s*a*0.35} 114 ${axs+s*a*0.05} 127`);
+      M.push(`M${lcs-s*t*0.05} 196Q${lcs+s*t*0.28} 224 ${lcs+s*t*0.02} 250`);
+      M.push(`M${lcs+s*t*0.6} 228Q${lcs+s*t*0.32} 248 ${lcs+s*t*0.12} 256`);
+      M.push(`M${lcs-s*t*0.62} 226Q${lcs-s*t*0.36} 246 ${lcs-s*t*0.12} 254`);
+      M.push(`M${lcs+s*t*0.55} 276Q${lcs+s*t*0.28} 292 ${lcs+s*t*0.38} 306`);
+      M.push(`M${lcs-s*t*0.6} 278Q${lcs-s*t*0.38} 292 ${lcs-s*t*0.44} 302`);
+      for(const [y,k] of [[111,0.68],[122,0.72],[133,0.7]])A.push(`M${X(3)} ${y}Q${X(w*k*0.5)} ${y+2} ${X(w*k)} ${y-2}`);
+      A.push(`M${X(w*0.86)} 146Q${X(w*0.55)} 164 ${X(7)} 176`);
+    }
+    A.push(`M${c} 104L${c} 150`);
+    d+=`<path class="mus" ${op(mus)} d="${M.join('')}M${c} 72L${c} 100"/><path class="mus" ${op(lean*0.55+mus*0.45)} d="${A.join('')}"/>`;
+  }
+  const pts={neck:[c,56],shoulders:[c+sh,80],chest:[c+ch*0.5,96],waist:[c+w,138],arm:[ax,116],hip:[c-hp,168],thigh:[lc,214]};
+  return {d,pts};
 }
-const SIL_LY={neck:['r',36],shoulders:['r',100],chest:['r',164],waist:['r',228],arm:['l',120],hip:['l',200],thigh:['l',280]};
+const SIL_LY={neck:['r',30],shoulders:['r',88],chest:['r',146],waist:['r',204],arm:['l',96],hip:['l',166],thigh:['l',236]};
 function silhouette(){
   const cur={},first={};let any=false,diff=false;
   for(const [k] of MEASURES){const e=lastOf(k);if(e){cur[k]=e[k];any=true}let f=null;for(const x of S.body)if(x[k]!=null&&(!f||x.date<f.date))f=x;if(f){first[k]=f[k];if(e&&f[k]!==e[k])diff=true}}
-  const now=bodyPaths(cur),old=diff?bodyPaths(first):null;
+  const now=bodyPaths(cur),old=diff?bodyPaths(first,true):null;
   let lines='',labels='';
   for(const [k,l] of MEASURES){
     const [x,y]=now.pts[k],[side,ly]=SIL_LY[k],e=lastOf(k),right=side==='r',lx=right?304:96;
     lines+=`<path class="ld" d="M${x.toFixed(1)} ${y}L${right?Math.max(x+14,272):Math.min(x-14,128)} ${ly}L${lx} ${ly}"/><circle class="hs${e?' on':''}" cx="${x.toFixed(1)}" cy="${y}" r="4.5"/>`;
     labels+=`<button class="sl ${right?'r':'l'}" style="top:${(ly/360*100).toFixed(2)}%" data-act="measure" data-k="${k}"><span>${l}</span><b>${e?NF1.format(e[k])+' cm':'Añadir'}</b></button>`;
   }
-  return `<div class="sil"><svg viewBox="0 0 400 360" aria-hidden="true">${old?`<g class="fg old">${old.d}</g>`:''}<g class="fg">${now.d}</g>${lines}</svg>${labels}</div>${old?`<p class="help"><span class="lg-old"></span>Tu cuerpo con tus primeras medidas. La figura se dibuja con las medidas que apuntas.</p>`:any?`<p class="help">La figura se dibuja con tus medidas. Cuando apuntes otras nuevas, verás tu forma de antes en discontinuo.</p>`:''}`;
+  return `<div class="sil"><svg viewBox="0 0 400 360" aria-hidden="true"><g class="fg">${now.d}</g>${old?`<g class="fg old">${old.d}</g>`:''}${lines}</svg>${labels}</div>${old?`<p class="help"><span class="lg-old"></span>Tu cuerpo con tus primeras medidas. La figura se dibuja con las medidas que apuntas.</p>`:any?`<p class="help">La figura se dibuja con tus medidas. Cuando apuntes otras nuevas, verás tu forma de antes en discontinuo.</p>`:''}`;
 }
 function vIndexV(){
   const sh=lastOf('shoulders'),wa=lastOf('waist');
@@ -1069,7 +1105,7 @@ function vSettings(){
     <input type="file" id="import-file" class="vh" tabindex="-1"></section>
   ${S.sample?`<section class="sec"><h2 class="h">Datos de ejemplo</h2><p class="help">Ahora ves una rutina y unos entrenos inventados para probar la app.</p><div class="form-acts"><button class="btn soft danger" data-act="clear-sample">Borrar datos de ejemplo</button></div></section>`:''}
   <div class="form-acts sec"><button class="btn soft danger" data-act="wipe">Borrar todos los datos</button></div>
-  <p class="small foot">MCH 1.7. Funciona sin conexión y no envía tus datos a ningún sitio. Tipografía: TeX Gyre Adventor, de GUST e-foundry.</p>`;
+  <p class="small foot">MCH 1.9. Funciona sin conexión y no envía tus datos a ningún sitio. Tipografía: TeX Gyre Adventor, de GUST e-foundry.</p>`;
 }
 
 function vRoutine(){
