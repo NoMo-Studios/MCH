@@ -390,8 +390,13 @@ span.cam-ic{background:none}
 .tip-card .link{justify-self:start}
 .hero-main{display:flex;gap:14px;align-items:flex-start;justify-content:space-between}
 .hero-txt{flex:1;min-width:0}
-.rec-line{margin-top:10px;font-size:15px;color:var(--ink)}
-.rec-mini{flex:none;position:relative;width:96px;height:148px;margin:-6px -8px 0 0;border-radius:16px;transition:transform 160ms var(--ease-out)}
+.hero .rec-line{margin-top:10px;font-size:15px;color:var(--ink)}
+.hero-skip{display:flex;align-items:center;flex-wrap:wrap;margin-top:2px;font-size:15px;color:var(--ink-2)}
+.hero-skip .link{padding:0 8px}
+.rec-mini{flex:none;display:flex;flex-direction:column;align-items:center;margin:-6px -8px 0 0;border-radius:16px;transition:transform 160ms var(--ease-out)}
+.rec-fig{position:relative;display:block;width:96px;height:148px}
+.rec-cap{display:inline-flex;align-items:center;margin-top:2px;font-size:13px;font-weight:600;color:var(--ink-2);white-space:nowrap}
+.rec-cap svg.i{width:15px;height:15px;stroke-width:2.2;margin-right:-3px}
 .rec-mini:active{transform:scale(.96)}
 .rec-c{position:absolute;inset:0;display:block}
 .rec-c .f3-c{position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;transition:opacity 500ms var(--ease-out)}
@@ -804,7 +809,10 @@ function makeEntry(exId,item){
   return {ex:exId,item:item?item.id:null,min:item?item.min:null,max:item?item.max:null,target,sug,stall:stalled(exId),last:last?last.sets.map(s=>({w:s.w,r:s.r})):null,sets};
 }
 const isoT=t=>isoDate(new Date(t));
-const skipOn=t=>(S.skips||[]).find(k=>k.date===isoT(t));
+const skipsOn=t=>(S.skips||[]).filter(k=>k.date===isoT(t));
+const skipOn=t=>skipsOn(t)[0];
+const restOn=t=>skipsOn(t).find(k=>!k.advance);
+const skipDay=t=>dayStart(t)<dayStart(Date.now())?!!skipOn(t):!!restOn(t);
 const sdur=s=>s.late?'—':dur(s.end-s.start);
 function nextDay(){
   let last=null;
@@ -888,13 +896,14 @@ function vHoy(){
     <ul class="tpls">${TEMPLATES.map(T=>`<li><button class="tpl" data-act="tpl" data-id="${T.id}"><span class="tpl-n">${T.days.filter(d=>d.name!=='Cuello').length}<i>días</i></span><span class="main"><span class="t">${esc(T.title)}</span><span class="s">${esc(T.sub)}</span></span>${icon('right','i chev')}</button></li>`).join('')}</ul>
     <div class="hero-acts"><button class="btn soft" data-act="routine">Crear la mía desde cero</button><button class="btn text" data-act="sample">Ver un ejemplo</button></div></section>`;
   }else{
-    const nx=nextDay(),lt=lastDone(nx.id),sk=skipOn(now),trainedToday=S.sessions.some(x=>dayStart(x.start)===dayStart(now));
+    const nx=nextDay(),lt=lastDone(nx.id),sk=restOn(now),trainedToday=S.sessions.some(x=>dayStart(x.start)===dayStart(now));
+    const adv=trainedToday?[]:skipsOn(now).filter(k=>k.advance);
     if(sk&&!trainedToday){
-      h+=`<section class="hero"><p class="muted">Hoy</p><p class="hero-day">Descanso</p><p class="muted">Has saltado ${esc(sk.dayName)}. ${sk.advance?`El próximo día toca ${esc(nx.name)}.`:`El próximo día te volverá a tocar ${esc(sk.dayName)}.`}</p>
-      <div class="hero-acts"><button class="btn soft" data-act="train-anyway">Entrenar igualmente</button><button class="btn text" data-act="unskip">Deshacer</button></div></section>`;
+      h+=`<section class="hero"><p class="muted">Hoy</p><p class="hero-day">Descanso</p><p class="muted">El próximo día que entrenes te toca ${esc(nx.name)}${nx.label?`, ${esc(nx.label)}`:''}.</p>
+      <div class="hero-acts"><button class="btn soft" data-act="train-anyway">Entrenar igualmente</button><button class="btn text" data-act="unskip" data-k="rest">Deshacer</button></div></section>`;
     }else{
     const rs=recState(now),mini=rs.any&&f3Init();
-    h+=`<section class="hero"><div class="hero-main"><div class="hero-txt"><p class="muted">Te toca</p><p class="hero-day">${esc(nx.name)}</p>${nx.label?`<p class="hero-label">${esc(nx.label)}</p>`:''}<p class="muted">${plural(nx.items.length,'ejercicio','ejercicios')}${lt?`. La última vez, ${ago(lt)}`:''}.</p>${mini?`<p class="rec-line">${esc(recLine(nx,rs))}</p>`:''}</div>${mini?`<button class="rec-mini" data-act="rec" aria-label="Ver la recuperación de tus músculos"><span class="rec-c" id="recmini"></span></button>`:''}</div>
+    h+=`<section class="hero"><div class="hero-main"><div class="hero-txt"><p class="muted">Te toca</p><p class="hero-day">${esc(nx.name)}</p>${nx.label?`<p class="hero-label">${esc(nx.label)}</p>`:''}<p class="muted">${plural(nx.items.length,'ejercicio','ejercicios')}${lt?`. La última vez, ${ago(lt)}`:''}.</p>${adv.length?`<p class="hero-skip">Has saltado ${esc(adv.map(k=>k.dayName).join(' y '))}.<button class="link" data-act="unskip" data-k="adv">Deshacer</button></p>`:''}${mini?`<p class="rec-line">${esc(recLine(nx,rs))}</p>`:''}</div>${mini?`<button class="rec-mini" data-act="rec" aria-label="Ver la recuperación de tus músculos"><span class="rec-fig"><span class="rec-c" id="recmini"></span></span><span class="rec-cap" aria-hidden="true">Recuperación${icon('right')}</span></button>`:''}</div>
     <div class="hero-acts"><button class="btn primary" data-act="start" data-id="${esc(nx.id)}">Empezar</button>${trainedToday?'':`<button class="btn text" data-act="skip" data-id="${esc(nx.id)}">Saltar hoy</button>`}</div></section>`;
     }
   }
@@ -902,7 +911,7 @@ function vHoy(){
     const ws=weekStart(now),done=trainedDays(ws,addDays(ws,7)),today=dayStart(now);
     const L=['L','M','X','J','V','S','D'],full=['lunes','martes','miércoles','jueves','viernes','sábado','domingo'];
     let cells='';
-    for(let i=0;i<7;i++){const t=addDays(ws,i),sk2=!done.has(t)&&skipOn(t);cells+=`<div class="wd${done.has(t)?' on':''}${sk2?' skip':''}${t===today?' today':''}"><i></i><span aria-hidden="true">${L[i]}</span><span class="vh">${full[i]}${done.has(t)?', entrenado':sk2?', saltado':''}</span></div>`}
+    for(let i=0;i<7;i++){const t=addDays(ws,i),sk2=!done.has(t)&&skipDay(t);cells+=`<div class="wd${done.has(t)?' on':''}${sk2?' skip':''}${t===today?' today':''}"><i></i><span aria-hidden="true">${L[i]}</span><span class="vh">${full[i]}${done.has(t)?', entrenado':sk2?', saltado':''}</span></div>`}
     const n=done.size;
     h+=`<section class="sec"><div class="sec-head"><h2 class="h">Esta semana</h2><span class="aux">${n} de ${S.goal} ${S.goal===1?'día':'días'}${n>=S.goal?', hecho':''}</span></div><div class="week">${cells}</div></section>`;
   }
@@ -957,7 +966,7 @@ function setRow(st,i,j){
 
 function vYear(){
   const now=Date.now(),today=dayStart(now),y=calYear,cy=new Date(now).getFullYear();
-  const trained=new Set(S.sessions.map(x=>dayStart(x.start))),skipped=new Set((S.skips||[]).map(k=>dateNum(k.date)));
+  const trained=new Set(S.sessions.map(x=>dayStart(x.start))),skipped=new Set((S.skips||[]).map(k=>dateNum(k.date)).filter(skipDay));
   let total=0,months='';
   for(let m=0;m<12;m++){
     const first=new Date(y,m,1),off=(first.getDay()+6)%7,n=new Date(y,m+1,0).getDate();let cnt=0,cells='';
@@ -983,7 +992,7 @@ function vHist(){
   let cells=['L','M','X','J','V','S','D'].map(x=>`<span class="ch" aria-hidden="true">${x}</span>`).join('');
   for(let i=0;i<off;i++)cells+='<span></span>';
   for(let dd=1;dd<=n;dd++){
-    const t=new Date(calMonth.y,calMonth.m,dd).getTime(),s=byDay.get(t),sk=!s&&skipOn(t);
+    const t=new Date(calMonth.y,calMonth.m,dd).getTime(),s=byDay.get(t),sk=!s&&skipDay(t)&&skipOn(t);
     const cls=`cd${s?' on':''}${sk?' skip':''}${t===today?' today':''}${t>today?' future':''}`;
     const lab=esc(cap(F.long.format(t)))+(s?': '+esc(sessionTitle(s)):sk?': saltado':'');
     cells+=t>today?`<span class="${cls}"><span>${dd}</span></span>`:`<button class="${cls}" data-act="cal-day" data-t="${t}" aria-label="${lab}"><span>${dd}</span></button>`;
@@ -2194,7 +2203,7 @@ function spark(vals){
 const sheet=document.getElementById('sheet'),scrim=document.getElementById('scrim'),toastEl=document.getElementById('toast');
 let sheetOpen=false,lastFocus=null,sheetActs=[],closeT=0;
 function openSheet(html){
-  clearTimeout(closeT);
+  clearTimeout(closeT);clearTimeout(toastT);toastEl.classList.remove('on');
   sheet.innerHTML=`<div class="grab" aria-hidden="true"></div>${html}`;
   sheet.hidden=false;scrim.hidden=false;sheet.style.transform='';sheet.classList.remove('closing');
   void sheet.offsetHeight;
@@ -2247,7 +2256,7 @@ function haptic(){try{if(navigator.vibrate)navigator.vibrate(8);else hx.click()}
 function startDay(id,t){
   const day=S.days.find(d=>d.id===id);if(!day)return;
   const now=Date.now(),past=t!=null&&dayStart(+t)<dayStart(now),start=past?dayStart(+t)+19*3600e3:now;
-  S.skips=(S.skips||[]).filter(k=>k.date!==isoT(start));
+  S.skips=(S.skips||[]).filter(k=>!(k.date===isoT(start)&&!k.advance));
   S.draft={id:uid(),day:day.id,dayName:day.name,dayLabel:day.label||'',start,created:now,past,lastAt:null,y:0,entries:day.items.filter(it=>S.ex[it.ex]).map(it=>makeEntry(it.ex,it))};
   save();closeSheet();nav=[{v:'hoy'},{v:'workout'}];render();scrollTo(0,0);
 }
@@ -2363,14 +2372,18 @@ const ACT={
   skip:d=>{
     const day=S.days.find(x=>x.id===d.id);if(!day)return;
     const i=S.days.indexOf(day),nx=S.days[(i+1)%S.days.length];
-    const add=advance=>{S.skips=(S.skips||[]).filter(k=>k.date!==isoT(Date.now()));S.skips.push({date:isoT(Date.now()),t:Date.now(),day:day.id,dayName:day.name,advance});save();renderKeep();toast('Día saltado')};
-    actionSheet(`¿Saltar ${day.name} hoy?`,'Quedará marcado en tu historial como día saltado.',[
-      {label:`Hacerlo el próximo día`,kind:'primary',run:()=>add(false)},
-      ...(S.days.length>1?[{label:`Saltarlo y pasar a ${nx.name}`,kind:'soft',run:()=>add(true)}]:[]),
+    const multi=S.days.length>1;
+    const add=advance=>{const td=isoT(Date.now());S.skips=(S.skips||[]).filter(k=>!(k.date===td&&!k.advance));S.skips.push({date:td,t:Date.now(),day:day.id,dayName:day.name,advance});save();renderKeep();scrollTo(0,0);toast(advance?`Ahora te toca ${nx.name}`:'Hoy descansas')};
+    actionSheet(`¿Saltar ${day.name}?`,multi?`Puedes descansar hoy y dejar ${day.name} para el próximo día, o saltarlo y pasar ya a ${nx.name}.`:'Hoy quedará como día de descanso.',[
+      {label:'Descansar hoy',kind:'primary',run:()=>add(false)},
+      ...(multi?[{label:`Pasar a ${nx.name}`,kind:'soft',run:()=>add(true)}]:[]),
       {label:'Cancelar',kind:'text'}]);
   },
-  unskip:()=>{S.skips=(S.skips||[]).filter(k=>k.date!==isoT(Date.now()));save();renderKeep()},
-  'train-anyway':()=>{const k=skipOn(Date.now());S.skips=(S.skips||[]).filter(x=>x!==k);save();const day=k&&S.days.find(x=>x.id===k.day);if(day)ACT.start({id:day.id});else renderKeep()},
+  unskip:d=>{const td=isoT(Date.now()),all=(S.skips||[]).slice();
+    if(d.k==='adv'){for(let i=all.length-1;i>=0;i--)if(all[i].date===td&&all[i].advance){all.splice(i,1);break}S.skips=all}
+    else S.skips=all.filter(k=>!(k.date===td&&!k.advance));
+    save();renderKeep()},
+  'train-anyway':()=>{const td=isoT(Date.now());S.skips=(S.skips||[]).filter(k=>!(k.date===td&&!k.advance));save();const day=nextDay();if(day)ACT.start({id:day.id});else renderKeep()},
   hmode:d=>{histMode=d.m;renderKeep()},
   yr:d=>{calYear+= +d.d;renderKeep()},
   ym:d=>{calMonth={y:calYear,m:+d.m};histMode='mes';render();scrollTo(0,0)},
@@ -2384,7 +2397,7 @@ const ACT={
       openSheet(`<h2 class="sh-t">¿Qué entrenaste?</h2><p class="sh-p">${esc(cap(F.long.format(t)))}</p><ul class="plain pick-day">${S.days.map(dd=>`<li><button class="row" data-act="start" data-id="${esc(dd.id)}" data-t="${t}"><span class="main"><span class="t">${esc(dd.name)}</span>${dd.label?`<span class="s">${esc(dd.label)}</span>`:''}</span>${icon('right','i chev')}</button></li>`).join('')}</ul><div class="sh-acts"><button class="btn text" data-act="sheet-close">Cancelar</button></div>`);
     }});
     if(!s.length){
-      if(sk)acts.push({label:'Quitar el salto',kind:'soft',run:()=>{S.skips=S.skips.filter(k=>k!==sk);save();renderKeep()}});
+      if(sk)acts.push({label:'Quitar el salto',kind:'soft',run:()=>{S.skips=S.skips.filter(k=>k.date!==isoT(t));save();renderKeep()}});
       else if(S.days.length)acts.push({label:'Marcar como saltado',kind:'soft',run:()=>{const nx=nextDay();S.skips=(S.skips||[]).concat({date:isoT(t),t:t+12*3600e3,day:nx.id,dayName:nx.name,advance:false});save();renderKeep()}});
     }
     acts.push({label:'Cancelar',kind:'text'});
